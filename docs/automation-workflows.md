@@ -6,15 +6,15 @@
 - Make.com checks schedule daily
 - Sends personalized order forms via Twilio
 - Timing based on each customer's individual cadence
-- Sends several days before scheduled delivery
+- Sends two days before scheduled delivery date a
 
 ### 2. Reminder System
 - Monitors which customers have not submitted orders
-- Sends reminder messages if order not received
-- Continues until customer submits or delivery day arrives
+- Sends reminder messages if order not received (2 on Day-2, 2 on Day-1)
+- Continues until customer declines order, submits, or 5PM delivery day cut-off arrives
 
 ### 3. Order Processing
-- Receives submission from Fillout form
+- Receives submission from form 
 - Creates invoice in QuickBooks Online
 - Updates daily delivery list in Google Sheets
 - Sends order confirmation text to customer
@@ -27,7 +27,7 @@
 - Supports customers who reply to texts instead of clicking the order form
 
 ## Key Integrations
-- Fillout.com (Form submission)
+- Custom Web Form (Form submission)
 - Twilio (SMS notifications and replies)
 - QuickBooks Online (Invoice creation)
 - Google Sheets (Delivery reports and data storage)

@@ -12,12 +12,13 @@ This document outlines the structure of the five main Google Sheets tabs used in
 - Staff Pick
 - Notes
 
-## Recurring Orders Tab
+## Previous Tab
 - QuickBooks ID
 - Customer Name
 - SKU
 - Product Name
 - Default Quantity
+- unit
 - Frequency
 - Day of Week
 - Active

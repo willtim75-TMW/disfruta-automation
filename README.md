@@ -5,7 +5,7 @@ Automated ordering system for Disfruta using Fillout forms, Google Sheets, Make.
 This system allows new and recurring customers to receive personalized order forms via text message, review and modify their previous order, and submit new orders that automatically create invoices in QuickBooks Online and produce daily delivery lists.
 
 # Tech Stack
-- **Frontend**: Fillout.com (forms)
+- **Frontend**: Custome Web Form and Javascript (forms)
 - **Database**: Google Sheets
 - **Automation**: Make.com
 - **Accounting**: Quickbooks Online
@@ -19,11 +19,11 @@ This system allows new and recurring customers to receive personalized order for
 - **Improves order quality** - Faster order collection and automated invoicing
 - **Better customer experience** - Personalized, convenient, and professional ordering process
 - **Instant confirmation & visibility** - Customers receive immediate order confirmation via text, while owners get real-time notifications for every new order
-- **Easy to maintain** Owners can update products and pricing easily anywhere
+- **Easy to maintain** Owners can update products and pricing easily 
 - **Accurate daily delivery lists** - Easily viewable delivery lists creatded daily in Google Sheets
 
 # How It Works
-Make.com automatically sends each customer a personalized order form several days before their scheduled delivery day, with timing based on each customer’s individual ordering cadence. If a customer hasn’t submitted their order, they receive friendly reminder messages. When the customer clicks the link, they are taken to a personalized Fillout form showing their previous order. They can easily modify quantities, remove items, or add new products. Once submitted, the customer immediately receives an order confirmation text, and the owners are notified of the new order. 
+Make.com automatically sends each customer a personalized order form two days before their scheduled delivery day. If a customer hasn’t submitted their order, they receive friendly reminder messages up until order cut-off. Customer has the ability to go to order form or decline weekly order.  When the customer clicks the order link, they are taken to a personalized webform showing their business info and previous order details. They can easily re-order, modify quantities, remove items, or add new products. Once submitted, the customer immediately receives an order confirmation text, and the owners are notified of the new order. 
 
 Any text replies sent by customers are automatically forwarded to the owner's phone. Make.com then creates an invoice in QuickBooks Online and updates the daily delivery list in Google Sheets.
 
@@ -33,7 +33,7 @@ The main goal of this project is to create a simple, automated ordering system t
 # Data Structure
 1. **Products** Contains all product information including SKU, name, description, price, category, staff pick status, and active status.
 2. **Clients** Stores customer information including QuickBooks ID, name, phone number, ordering frequency, and preferences.
-3. **Recurring Orders** Links each customer to their standard order items and quantities.
+3. **Recurring Orders** Links each customer to their last non-NULL order items and quantities.
 4. **Notes** Captures customer notes from orders, including complaints, sample requests, delivery issues, or special instructions.
 5. **Delivery Reports** Generates daily delivery lists for the driver showing exactly what needs to be pulled and delivered each day.
 

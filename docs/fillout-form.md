@@ -5,16 +5,22 @@ Create a clean, personalized, and mobile-friendly order form that makes it easy 
 
 ## Form Layout
 
+### Admin Header (Only Available on seperarte admin page)
+- Customer Select (Quickbooks Online id - Name Mapping)
+Selecting a customer in Customer Select fills header and allows for ordering on behalf of client 
+
 ### Header
 - Customer Name (personalized)
 - Next Delivery Day
 - Title: "What would you like this week?"
 
-### 1. Your Current Order
+
+### 1. Your Previous Order 
 - Product Name
 - Short description
-- Price per unit
-- Quantity selector (pre-filled)
+- Unit
+- Price 
+- Quantity selector (pre-filled - determined by Unit)
 - Line subtotal
 - Remove button
 
@@ -34,6 +40,6 @@ Create a clean, personalized, and mobile-friendly order form that makes it easy 
 - Large "Submit Order" button
 
 ## Key Notes
-- Form must be submitted by 8:00 PM the day before delivery
+- Form must be submitted by 5:00 PM the day before delivery
 - Fully mobile optimized
 - Customer can add special notes or instructions
