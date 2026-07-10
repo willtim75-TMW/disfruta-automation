@@ -23,7 +23,9 @@ This system allows new and recurring customers to receive personalized order for
 - **Accurate daily delivery lists** - Easily viewable delivery lists creatded daily in Google Sheets
 
 # How It Works
-Make.com automatically sends each customer a personalized order form several days before their scheduled delivery day, with timing based on each customer’s individual ordering cadence. If a customer hasn’t submitted their order, they receive friendly reminder messages. When the customer clicks the link, they are taken to a personalized Fillout form showing their previous order. They can easily modify quantities, remove items, or add new products. Once submitted, the customer immediately receives an order confirmation text, and the owners are notified of the new order. Make.com then creates an invoice in QuickBooks Online and updates the daily delivery list in Google Sheets.
+Make.com automatically sends each customer a personalized order form several days before their scheduled delivery day, with timing based on each customer’s individual ordering cadence. If a customer hasn’t submitted their order, they receive friendly reminder messages. When the customer clicks the link, they are taken to a personalized Fillout form showing their previous order. They can easily modify quantities, remove items, or add new products. Once submitted, the customer immediately receives an order confirmation text, and the owners are notified of the new order. 
+
+Any text replies sent by customers are automatically forwarded to the owner's phone. Make.com then creates an invoice in QuickBooks Online and updates the daily delivery list in Google Sheets.
 
 # Project Goals
 The main goal of this project is to create a simple, automated ordering system that allows new and recurring customers to easily place and modify their orders through a personalized form sent via text message. By streamlining the ordering process, we aim to reduce manual effort for the owners, minimize order errors, increase average order value through smart recommendations, and ensure consistent, timely order submission. Ultimately, the system should make ordering and reordering effortless for customers while giving the business better visibility and control through automated delivery lists and QuickBooks integration.
@@ -42,3 +44,10 @@ The main goal of this project is to create a simple, automated ordering system t
 - Driver routing and mapping optimization
 - AI-powered text messaging
 - SMS payment collection
+
+### Documentation
+- (docs/project-overview.md) - High-level project summary and system architecture
+- (docs/data-schema.md) - Structure of all Google Sheets tabs
+- (docs/form-flow.md) - Customer journey and form behavior
+- (docs/automation-workflows.md) - Make.com processes and integrations
+- (docs/limitations.md) - Known system limitations and constraints
