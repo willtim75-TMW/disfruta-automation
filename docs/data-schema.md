@@ -6,21 +6,10 @@ This document outlines the structure of the five main Google Sheets tabs used in
 - SKU
 - Product Name
 - Description
-- Price
-- Unit
 - Category
+- Price
+- Active
 - Staff Pick
-- Active
-- Notes
-
-## Clients Tab
-- QuickBooks ID
-- Customer Name
-- Phone Number
-- Email
-- Frequency
-- Last Order Date
-- Active
 - Notes
 
 ## Recurring Orders Tab
@@ -33,6 +22,16 @@ This document outlines the structure of the five main Google Sheets tabs used in
 - Day of Week
 - Active
 - Last Order Date
+- Notes
+
+## Clients Tab
+- QuickBooks ID
+- Customer Name
+- Phone Number
+- Email
+- Frequency
+- Last Order Date
+- Active
 - Notes
 
 ## Notes Tab

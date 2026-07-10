@@ -5,7 +5,7 @@ The system sends customers a personalized order form via text message several da
 
 ## Customer Journey
 1. Customer receives text message with personalized link
-2. Customer clicks link and opens Fillout form
+2. Customer clicks link and opens Order form
 3. Form displays their previous/recurring order
 4. Customer can modify quantities, remove items, or add new items
 5. Customer submits order
