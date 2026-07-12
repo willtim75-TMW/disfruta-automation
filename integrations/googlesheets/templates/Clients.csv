@@ -1,0 +1,4 @@
+QuickBooks ID,Customer Name,Phone Number,Email,Frequency,Day of Week,Next Delivery Date,Last Order Date,Active,Notes
+24,Mercado Latino Fresh,+15551234001,orders@mercadolatino.example,Weekly,Wednesday,2026-07-15,2026-07-08,Yes,
+31,La Casa Market,+15551234002,manager@lacasamarket.example,Twice Weekly,Tuesday,2026-07-14,2026-07-07,Yes,
+48,El Rincon Restaurant,+15551234003,kitchen@elrincon.example,Weekly,Friday,2026-07-17,2026-07-10,Yes,

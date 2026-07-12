@@ -1,53 +1,128 @@
-# Disfruta Order Automation
-Automated ordering system for Disfruta using Fillout forms, Google Sheets, Make.com, and QuickBooks Online.
+# DisFruta Order Automation
 
-# Overview
-This system allows new and recurring customers to receive personalized order forms via text message, review and modify their previous order, and submit new orders that automatically create invoices in QuickBooks Online and produce daily delivery lists.
+Automated ordering system for **DisFruta** using a custom mobile web form, Google Sheets, **Make.com** (orchestration hub), QuickBooks Online, and Twilio.
 
-# Tech Stack
-- **Frontend**: Custome Web Form and Javascript (forms)
-- **Database**: Google Sheets
-- **Automation**: Make.com
-- **Accounting**: Quickbooks Online
-- **Messaging**: Twillio
+## Overview
 
-# Key Benefits
-- **Saves time** - Customers can quickly reorder instead of texting their order
-- **Reduces errors** - Orders go directly into the QuickBooks Online system with accurate quantities and pricing
-- **Increases order value** - Smart layout encourages customers to add extra items while also helping move specific inventory (promotions, overstock, or soon-to-expire items)
-- **Increases order consistency** - Automated reminders encourage customers to place their order and follow up if they haven’t submitted one yet
-- **Improves order quality** - Faster order collection and automated invoicing
-- **Better customer experience** - Personalized, convenient, and professional ordering process
-- **Instant confirmation & visibility** - Customers receive immediate order confirmation via text, while owners get real-time notifications for every new order
-- **Easy to maintain** Owners can update products and pricing easily 
-- **Accurate daily delivery lists** - Easily viewable delivery lists creatded daily in Google Sheets
+New and returning customers get a personalized order form (SMS link or public entry), review or build their order, and submit. **Make.com** receives the submission and drives:
 
-# How It Works
-Make.com automatically sends each customer a personalized order form two days before their scheduled delivery day. If a customer hasn’t submitted their order, they receive friendly reminder messages up until order cut-off. Customer has the ability to go to order form or decline weekly order.  When the customer clicks the order link, they are taken to a personalized webform showing their business info and previous order details. They can easily re-order, modify quantities, remove items, or add new products. Once submitted, the customer immediately receives an order confirmation text, and the owners are notified of the new order. 
+- Google Sheets updates (orders, notes, previous order, delivery lists)
+- **QuickBooks Online invoice** creation
+- Customer confirmation + owner notification texts
 
-Any text replies sent by customers are automatically forwarded to the owner's phone. Make.com then creates an invoice in QuickBooks Online and updates the daily delivery list in Google Sheets.
+## Tech Stack
 
-# Project Goals
-The main goal of this project is to create a simple, automated ordering system that allows new and recurring customers to easily place and modify their orders through a personalized form sent via text message. By streamlining the ordering process, we aim to reduce manual effort for the owners, minimize order errors, increase average order value through smart recommendations, and ensure consistent, timely order submission. Ultimately, the system should make ordering and reordering effortless for customers while giving the business better visibility and control through automated delivery lists and QuickBooks integration.
+| Layer | Tool |
+|-------|------|
+| Frontend | Custom web form (`webform/`) — HTML/CSS/JS |
+| Data | Google Sheets (Products, Clients, Previous, Notes, Delivery Reports) |
+| Automation hub | **Make.com** |
+| Accounting | QuickBooks Online |
+| Messaging | Twilio |
 
-# Data Structure
-1. **Products** Contains all product information including SKU, name, description, price, category, staff pick status, and active status.
-2. **Clients** Stores customer information including QuickBooks ID, name, phone number, ordering frequency, and preferences.
-3. **Recurring Orders** Links each customer to their last non-NULL order items and quantities.
-4. **Notes** Captures customer notes from orders, including complaints, sample requests, delivery issues, or special instructions.
-5. **Delivery Reports** Generates daily delivery lists for the driver showing exactly what needs to be pulled and delivered each day.
+## How it works
 
-# Future Enhancements
-- Automated sync of customer data from QuickBooks Online
-- Customer portal for viewing order history
-- Advanced reporting and analytics dashboard
-- Driver routing and mapping optimization
-- AI-powered text messaging
-- SMS payment collection
+1. **Make.com** (or admin) sends a personalized order link via Twilio before delivery.
+2. Customer opens the form:
+   - **Returning:** `?customerId=<QBO_ID>` → previous order pre-filled  
+   - **New:** landing → “I’m a new customer” → business details + empty cart  
+   - **Admin:** `admin.html` → order on behalf of a client  
+3. Customer adjusts quantities, browses by category, searches the full catalog, optional staff picks, notes.
+4. Submit → **Make.com webhook** → Sheets + **QBO Create Invoice** + Twilio.
+5. Customer text replies to the Twilio number are forwarded to the owners.
 
-### Documentation
-- (docs/project-overview.md) - High-level project summary and system architecture
-- (docs/data-schema.md) - Structure of all Google Sheets tabs
-- (docs/form-flow.md) - Customer journey and form behavior
-- (docs/automation-workflows.md) - Make.com processes and integrations
-- (docs/limitations.md) - Known system limitations and constraints
+## Project layout
+
+```
+webform/                 Customer + admin order form
+make/                    Make.com scenario docs + sample payload
+server/                  Optional QBO helper API (Make can HTTP-call it)
+integrations/
+  googlesheets/          Sheet setup + CSV templates
+  quickbooks/            Invoice field mapping
+docs/                    Architecture, schema, flows, limitations
+Logo/                    Brand logo
+```
+
+## Quick start
+
+### 1. Preview the form
+
+```bash
+cd webform && python3 -m http.server 8080
+```
+
+- Landing / new customer: http://localhost:8080/  
+- New order direct: http://localhost:8080/?new=1  
+- Returning demo: http://localhost:8080/?customerId=24  
+- Admin: http://localhost:8080/admin.html  
+
+> Prefer HTTP (not `file://`). Products also load from embedded `js/products-data.js`.
+
+### 2. Connect Make.com (required for live orders)
+
+1. Create a **Custom webhook** scenario (see [make/order-processing.md](make/order-processing.md)).
+2. In `webform/js/config.js`:
+
+```js
+makeWebhookUrl: "https://hook.us1.make.com/xxxxxxxx",
+demoMode: false,
+webhookSecret: "optional-shared-secret",
+```
+
+3. Map webhook JSON → Sheets + **QuickBooks Online · Create Invoice** + Twilio.
+
+### 3. Google Sheets
+
+Live workbook (form can read Products / Clients / Previous when shared):
+
+https://docs.google.com/spreadsheets/d/1smT7aeA63aAQwggMQON1sjh1N3G7XBLNdPaKI82EnSA/edit  
+
+Setup: [integrations/googlesheets/README.md](integrations/googlesheets/README.md)
+
+## Documentation
+
+| Doc | Contents |
+|-----|----------|
+| [docs/project-overview.md](docs/project-overview.md) | Architecture, status, phase scope |
+| [docs/data-schema.md](docs/data-schema.md) | Google Sheets tabs (**Orders**, Order Lines, …) |
+| [docs/sms-copy.md](docs/sms-copy.md) | **Twilio SMS templates** (invite, reminders, confirm, owner) |
+| [docs/form-flow.md](docs/form-flow.md) | Customer / new / admin journeys |
+| [docs/fillout-form.md](docs/fillout-form.md) | Form UX sections (implemented in `webform/`) |
+| [docs/automation-workflows.md](docs/automation-workflows.md) | Make.com workflows |
+| [docs/limitations.md](docs/limitations.md) | Known constraints |
+| [webform/README.md](webform/README.md) | Form features, config, hosting |
+| [make/order-processing.md](make/order-processing.md) | **Make hub** — webhook → Sheets / QBO / Twilio |
+| [integrations/quickbooks/](integrations/quickbooks/) | QBO invoice mapping |
+| [integrations/googlesheets/](integrations/googlesheets/) | Sheet connection + CSV templates |
+| [server/README.md](server/README.md) | Optional QBO helper Make can call via HTTP |
+
+## Data structure (Google Sheets)
+
+1. **Products** — SKU, name, description, category, price, unit, active, staff pick, QBO item id  
+2. **Clients** — QuickBooks ID, name, phone, email, frequency / delivery day, active  
+3. **Previous** — Last order lines per customer (pre-fill cart)  
+4. **Orders** — One row per submission (status, invoice ids, reminder guard)  
+5. **Order Lines** — One row per line item  
+6. **Notes** — Free-text notes from orders  
+7. **Delivery Reports** — Daily driver pull lists (written by Make)  
+
+CSV templates: `integrations/googlesheets/templates/` (`Orders.csv`, `Order_Lines.csv`, …).
+
+## Key benefits
+
+- Faster reorders; less manual texting  
+- Accurate quantities/pricing into QBO  
+- Staff picks and catalog browse to grow order value  
+- Reminders until submit, decline, or cutoff  
+- Confirmation SMS + owner alerts  
+- Products/pricing editable in Sheets  
+
+## Future enhancements
+
+- Automated QBO → Sheets customer/product sync  
+- Customer order-history portal  
+- Reporting dashboard  
+- Driver routing  
+- AI-assisted text ordering  
+- SMS payment collection  

@@ -1,0 +1,4 @@
+timestamp,order_id,quickbooks_id,customer_name,line_num,sku,qbo_item_id,product_name,quantity,unit,unit_price,line_total,category
+2026-07-12T18:30:00.000Z,ord_demo_001,24,Mercado Latino Fresh,1,AREP-CH4,10,Arepa de Choclo-4 Pack,12,ea,4.83,57.96,Frozen Food
+2026-07-12T18:30:00.000Z,ord_demo_001,24,Mercado Latino Fresh,2,AREP-BAN,13,Arepa de Maiz Bandeja,6,ea,3.25,19.50,Frozen Food
+2026-07-12T18:30:00.000Z,ord_demo_001,24,Mercado Latino Fresh,3,COFFEE-COL,45,Colombian Coffee,2,ea,25.00,50.00,Soda/Drinks

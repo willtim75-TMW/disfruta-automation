@@ -1,0 +1,120 @@
+{
+  "version": "1.0",
+  "source": "customer-form",
+  "declined": false,
+  "submittedAt": "2026-07-12T18:30:00.000Z",
+  "customer": {
+    "qboCustomerId": "24",
+    "name": "Mercado Latino Fresh",
+    "phone": "+15551234001",
+    "email": "orders@mercadolatino.example",
+    "frequency": "Weekly",
+    "dayOfWeek": "Wednesday"
+  },
+  "delivery": {
+    "nextDeliveryDate": "2026-07-15",
+    "cutoffNote": "5:00 PM day before delivery"
+  },
+  "notes": "Please leave boxes at the back door. Need sample of Arepa de Choclo.",
+  "order": {
+    "lineCount": 3,
+    "subtotal": 118.96,
+    "currency": "USD",
+    "lines": [
+      {
+        "sku": "DF-0010",
+        "qboItemId": "10",
+        "name": "Arepa de Choclo-4 Pack",
+        "description": "Arepa de Choclo-4 Item Pack",
+        "unit": "ea",
+        "unitPrice": 4.83,
+        "quantity": 12,
+        "lineTotal": 57.96,
+        "category": "Prepared Foods"
+      },
+      {
+        "sku": "DF-0013",
+        "qboItemId": "13",
+        "name": "Arepa de Maiz Bandeja",
+        "description": "Arepa de Maiz Bandeja- Box of Twelve/10 Item Packs",
+        "unit": "ea",
+        "unitPrice": 3.25,
+        "quantity": 6,
+        "lineTotal": 19.5,
+        "category": "Prepared Foods"
+      },
+      {
+        "sku": "DF-0045",
+        "qboItemId": "45",
+        "name": "Colombian Coffee",
+        "description": "Colombian Coffee",
+        "unit": "ea",
+        "unitPrice": 25.0,
+        "quantity": 2,
+        "lineTotal": 50.0,
+        "category": "Dairy & Beverages"
+      }
+    ]
+  },
+  "quickbooks": {
+    "CustomerRef": {
+      "value": "24",
+      "name": "Mercado Latino Fresh"
+    },
+    "TxnDate": "2026-07-15",
+    "PrivateNote": "Please leave boxes at the back door. Need sample of Arepa de Choclo.",
+    "CustomerMemo": {
+      "value": "Thank you for your order with DisFruta!"
+    },
+    "Line": [
+      {
+        "DetailType": "SalesItemLineDetail",
+        "Amount": 57.96,
+        "Description": "Arepa de Choclo-4 Pack",
+        "LineNum": 1,
+        "SalesItemLineDetail": {
+          "Qty": 12,
+          "UnitPrice": 4.83,
+          "ItemRef": {
+            "value": "10",
+            "name": "Arepa de Choclo-4 Pack"
+          }
+        }
+      },
+      {
+        "DetailType": "SalesItemLineDetail",
+        "Amount": 19.5,
+        "Description": "Arepa de Maiz Bandeja",
+        "LineNum": 2,
+        "SalesItemLineDetail": {
+          "Qty": 6,
+          "UnitPrice": 3.25,
+          "ItemRef": {
+            "value": "13",
+            "name": "Arepa de Maiz Bandeja"
+          }
+        }
+      },
+      {
+        "DetailType": "SalesItemLineDetail",
+        "Amount": 50.0,
+        "Description": "Colombian Coffee",
+        "LineNum": 3,
+        "SalesItemLineDetail": {
+          "Qty": 2,
+          "UnitPrice": 25.0,
+          "ItemRef": {
+            "value": "45",
+            "name": "Colombian Coffee"
+          }
+        }
+      }
+    ]
+  },
+  "meta": {
+    "demoMode": false,
+    "userAgent": "Mozilla/5.0",
+    "url": "https://orders.disfruta.example/index.html?customerId=24",
+    "token": "example-token"
+  }
+}

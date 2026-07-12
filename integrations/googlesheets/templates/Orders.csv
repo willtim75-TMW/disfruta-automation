@@ -1,0 +1,3 @@
+timestamp,order_id,quickbooks_id,customer_name,phone,email,delivery_date,preferred_day,subtotal,currency,line_count,declined,is_new_customer,source,notes,qbo_invoice_id,qbo_doc_number,qbo_customer_id_resolved,status,error_message
+2026-07-12T18:30:00.000Z,ord_demo_001,24,Mercado Latino Fresh,+15551234001,orders@mercadolatino.example,2026-07-15,Wednesday,118.96,USD,3,No,No,customer-form,Leave at back door,147,1038,24,invoiced,
+2026-07-12T19:00:00.000Z,ord_demo_002,31,La Casa Market,+15551234002,manager@lacasamarket.example,2026-07-14,Tuesday,0,USD,0,Yes,No,customer-form,,,31,,declined,

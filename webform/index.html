@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f15a24" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>DisFruta — Your Weekly Order</title>
+    <meta
+      name="description"
+      content="Review and modify your DisFruta recurring order."
+    />
+    <link rel="icon" href="./assets/logo-300x238.png" type="image/png" />
+    <link rel="stylesheet" href="./assets/css/styles.css" />
+  </head>
+  <body>
+    <div class="brand-bar" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <div class="site-header-inner">
+        <img
+          class="logo"
+          src="./assets/logo-300x238.png"
+          alt="DisFruta"
+          width="64"
+          height="51"
+        />
+        <div class="header-copy">
+          <h1>DisFruta</h1>
+          <p class="header-meta">Wholesale · Fresh · On time</p>
+        </div>
+        <span class="badge" id="headerBadge">Weekly order</span>
+      </div>
+    </header>
+
+    <div id="loadingScreen" class="state-screen">
+      <div class="spinner" aria-hidden="true"></div>
+      <h2>Loading your order…</h2>
+      <p>Loading products and customer options.</p>
+    </div>
+
+    <!-- Public entry: new customers OR returning (link / lookup) -->
+    <div id="landing" class="landing hidden">
+      <img
+        class="logo-lg"
+        src="./assets/logo-300x238.png"
+        alt="DisFruta"
+        width="120"
+        height="95"
+      />
+      <h1>Order with DisFruta</h1>
+      <p>
+        Place a new wholesale order, or reopen your usual order with a
+        personalized link or phone lookup.
+      </p>
+
+      <div class="landing-actions">
+        <button type="button" class="btn btn-primary btn-block" id="startNewBtn">
+          I’m a new customer
+        </button>
+        <button type="button" class="btn btn-secondary btn-block" id="startReturningBtn">
+          I already order with DisFruta
+        </button>
+      </div>
+      <p class="landing-panel-sub" style="margin-top: 12px">
+        You can switch later if you pick the wrong option.
+      </p>
+
+      <div id="returningPanel" class="landing-panel hidden">
+        <h2 class="landing-panel-title">Find your account</h2>
+        <p class="landing-panel-sub">
+          Use the link from your text message, or look up with the phone number
+          on file.
+        </p>
+        <label class="field-label" for="lookupPhone">Phone number</label>
+        <input
+          id="lookupPhone"
+          type="tel"
+          inputmode="tel"
+          autocomplete="tel"
+          placeholder="(555) 123-4567"
+        />
+        <button type="button" class="btn btn-primary btn-block" id="lookupBtn">
+          Find my previous order
+        </button>
+        <p class="landing-hint" id="lookupHint"></p>
+        <p class="landing-panel-sub" style="margin-top: 12px">
+          Prefer SMS? Open the personalized link we sent you — it loads your
+          account automatically.
+        </p>
+      </div>
+
+      <p class="header-meta" style="margin-top: 24px">
+        <a href="./admin.html">Admin order entry</a>
+      </p>
+    </div>
+
+    <div id="errorScreen" class="state-screen error hidden">
+      <div class="icon" aria-hidden="true">!</div>
+      <h2>We couldn’t submit that</h2>
+      <p data-error-detail>
+        Something went wrong. Please try again.
+      </p>
+      <p class="header-meta" style="margin-top: 8px">
+        Tip: open the form via a local server, e.g.
+        <code>cd webform && python3 -m http.server 8080</code>
+        — not as a raw file:// page.
+      </p>
+      <button type="button" class="btn btn-primary" onclick="DisfrutaOrder.retry()">
+        Try again
+      </button>
+    </div>
+
+    <div id="successScreen" class="state-screen success hidden">
+      <div class="icon" aria-hidden="true">✓</div>
+      <h2>Order received</h2>
+      <p data-success-detail>
+        Thank you! Your order is in. You’ll get a confirmation text shortly.
+      </p>
+      <img
+        src="./assets/logo-300x238.png"
+        alt=""
+        width="80"
+        height="63"
+        style="margin: 0 auto; opacity: 0.9"
+      />
+    </div>
+
+    <main id="main" class="app hidden">
+      <section class="hero" aria-labelledby="heroTitle">
+        <p class="hero-kicker" id="heroKicker">Hello</p>
+        <h2 id="heroTitle">
+          <span id="customerName">Customer</span>
+        </h2>
+        <p id="heroSubtitle">What would you like this week?</p>
+        <div class="delivery-pill" id="deliveryPill">
+          Next delivery:
+          <span id="deliveryDate">—</span>
+        </div>
+        <p class="mode-switch hidden" id="modeSwitchNew">
+          <button type="button" class="btn-link" id="switchToReturningBtn">
+            ← Already a customer? Find your account
+          </button>
+        </p>
+        <p class="mode-switch hidden" id="modeSwitchReturning">
+          <button type="button" class="btn-link" id="switchToLandingBtn">
+            ← Back to start
+          </button>
+        </p>
+      </section>
+
+      <!-- New customer contact details -->
+      <section
+        class="section contact-section hidden"
+        id="contactSection"
+        aria-labelledby="contactHeading"
+      >
+        <div class="section-head">
+          <h3 id="contactHeading">Your business details</h3>
+        </div>
+        <p class="section-sub">
+          We’ll use this to set up your account and confirm the order. Fields
+          marked * are required. If you already order with DisFruta, use the
+          link above to look up your account instead.
+        </p>
+        <div class="card contact-card">
+          <div class="field-grid">
+            <div class="field field-full">
+              <label class="field-label" for="contactName"
+                >Business / customer name *</label
+              >
+              <input
+                id="contactName"
+                type="text"
+                autocomplete="organization"
+                placeholder="e.g. Mercado Latino Fresh"
+                required
+              />
+            </div>
+            <div class="field">
+              <label class="field-label" for="contactPhone">Phone *</label>
+              <input
+                id="contactPhone"
+                type="tel"
+                inputmode="tel"
+                autocomplete="tel"
+                placeholder="(555) 123-4567"
+                required
+              />
+            </div>
+            <div class="field">
+              <label class="field-label" for="contactEmail">Email</label>
+              <input
+                id="contactEmail"
+                type="email"
+                autocomplete="email"
+                placeholder="orders@business.com"
+              />
+            </div>
+            <div class="field">
+              <label class="field-label" for="contactDeliveryDay"
+                >Preferred delivery day</label
+              >
+              <select id="contactDeliveryDay">
+                <option value="">— Select —</option>
+                <option>Monday</option>
+                <option>Tuesday</option>
+                <option>Wednesday</option>
+                <option>Thursday</option>
+                <option>Friday</option>
+                <option>Saturday</option>
+              </select>
+            </div>
+            <div class="field field-full">
+              <label class="field-label" for="contactAddress"
+                >Delivery address</label
+              >
+              <input
+                id="contactAddress"
+                type="text"
+                autocomplete="street-address"
+                placeholder="Street, city, state, ZIP"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="notice" id="cutoffNotice" role="note">
+        Orders must be submitted by <strong>5:00 PM</strong> the day before
+        delivery.
+      </div>
+
+      <!-- Decline entire order period (returning customers) -->
+      <section
+        class="section decline-section hidden"
+        id="declineSection"
+        aria-labelledby="declineHeading"
+      >
+        <div class="decline-card">
+          <div class="decline-copy">
+            <h3 id="declineHeading">Don’t need a delivery this period?</h3>
+            <p>
+              Skip this cycle entirely — no invoice, and we stop reminders until
+              your next delivery window.
+            </p>
+          </div>
+          <button type="button" class="btn btn-decline" id="declineBtnTop">
+            No order this period
+          </button>
+        </div>
+      </section>
+
+      <!-- 1. Cart (previous order for returning, empty for new) -->
+      <section class="section" aria-labelledby="cartHeading">
+        <div class="section-head">
+          <h3 id="cartHeading">Your Order</h3>
+          <span class="count" id="cartCount">0 items</span>
+        </div>
+        <p class="section-sub" id="cartSub">
+          Add products below. Returning customers see last order pre-filled.
+        </p>
+        <div class="card" id="cartList"></div>
+      </section>
+
+      <!-- 2. Promotional / staff picks (hidden unless sheet has staff_pick items) -->
+      <section
+        class="section hidden"
+        id="promoSection"
+        aria-labelledby="promoTitle"
+      >
+        <div class="section-head">
+          <h3 id="promoTitle">Staff Picks</h3>
+        </div>
+        <p class="section-sub">One-tap adds for this week’s recommended items.</p>
+        <div class="promo-grid" id="promoGrid"></div>
+      </section>
+
+      <!-- 3. Add more items -->
+      <section class="section" aria-labelledby="browseHeading">
+        <div class="section-head">
+          <h3 id="browseHeading">Add More Items</h3>
+          <span class="count" id="browseCount">0 products</span>
+        </div>
+        <p class="section-sub" id="browseSub">
+          Search the <strong>full catalog</strong> anytime (all categories), or
+          pick a category chip to browse that group. Use
+          <strong>Add all</strong> to put every item in a category on your order.
+        </p>
+        <div class="search-wrap">
+          <label class="sr-only" for="searchInput">Search all products</label>
+          <input
+            id="searchInput"
+            type="search"
+            placeholder="Search all products by name, SKU…"
+            autocomplete="off"
+            enterkeyhint="search"
+            spellcheck="false"
+          />
+        </div>
+        <p class="search-scope-hint hidden" id="searchScopeHint" role="status">
+          Searching <strong>all products</strong> — category filter is paused
+          while you type.
+        </p>
+        <div class="category-tabs" id="categoryTabs" role="tablist"></div>
+        <div class="browse-toolbar hidden" id="browseToolbar">
+          <span id="browseToolbarLabel"></span>
+          <button type="button" class="btn btn-add" id="addCategoryAllBtn">
+            Add all in category
+          </button>
+        </div>
+        <div class="card browse-list" id="browseList"></div>
+      </section>
+
+      <!-- Notes -->
+      <section class="section notes" aria-labelledby="notesHeading">
+        <div class="section-head">
+          <h3 id="notesHeading">Special notes</h3>
+        </div>
+        <p class="section-sub">
+          Delivery instructions, substitutions, samples, or anything else we
+          should know.
+        </p>
+        <label class="sr-only" for="notesInput">Order notes</label>
+        <textarea
+          id="notesInput"
+          placeholder="e.g. Leave at back door · Need sample of arepas"
+          maxlength="1000"
+        ></textarea>
+      </section>
+
+      <div class="secondary-actions hidden" id="declineFooter">
+        <button type="button" class="btn btn-ghost" id="declineBtn">
+          No order needed this period
+        </button>
+      </div>
+    </main>
+
+    <!-- 4. Sticky order summary -->
+    <div class="summary-bar" role="region" aria-label="Order summary">
+      <div class="summary-inner summary-inner-split">
+        <div>
+          <p class="summary-total-label">Total</p>
+          <p class="summary-total" id="summaryTotal">$0.00</p>
+          <p class="summary-meta" id="summaryCount">0 items</p>
+        </div>
+        <div class="summary-actions">
+          <button
+            type="button"
+            class="btn btn-secondary summary-decline hidden"
+            id="declineBtnBar"
+          >
+            Skip period
+          </button>
+          <button type="button" class="btn btn-primary" id="submitBtn" disabled>
+            Submit Order
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="./js/config.js"></script>
+    <!-- Embedded data: works without fetch (file:// and any static host) -->
+    <script src="./js/products-data.js"></script>
+    <script src="./js/customers-data.js"></script>
+    <script src="./js/sheets.js"></script>
+    <script src="./js/app.js"></script>
+  </body>
+</html>
