@@ -591,7 +591,7 @@
 
     if (els.heroSubtitle) {
       els.heroSubtitle.textContent = isNew
-        ? "Build your first order — search or browse products below."
+        ? "Build your order — Search or Browse products below."
         : "What would you like this week?";
     }
 
@@ -601,8 +601,11 @@
         : "Your Previous Order";
     }
     if (els.cartSub) {
+      const hasStaffPicks = staffPickProducts().length > 0;
       els.cartSub.textContent = isNew
-        ? "Add items from Staff Picks or the catalog below."
+        ? hasStaffPicks
+          ? "Add items from Staff Picks or the catalog below."
+          : "Add items from the catalog below."
         : "Adjust quantities or remove items. Your last order is pre-filled.";
     }
 
@@ -616,7 +619,10 @@
         if (els.deliveryDate) els.deliveryDate.textContent = day;
       }
       if (els.cutoffNotice) {
-        els.cutoffNotice.innerHTML = `Orders must be submitted by <strong>5:00 PM</strong> the day before delivery. New accounts are reviewed by DisFruta before the first delivery.`;
+        els.cutoffNotice.innerHTML = `
+          <p class="notice-primary"><strong>Orders must be submitted by <span class="notice-time">5:00 PM</span> the day before delivery</strong></p>
+          <p class="notice-secondary">New accounts are reviewed by DisFruta before the first delivery</p>
+        `;
       }
     } else if (state.customer) {
       if (els.customerName) els.customerName.textContent = state.customer.name;
@@ -628,13 +634,14 @@
         els.deliveryDate.textContent = label;
       }
       if (els.cutoffNotice) {
-        els.cutoffNotice.innerHTML = `Orders must be submitted by <strong>5:00 PM</strong>${
-          state.customer.nextDeliveryDate
-            ? ` on <strong>${dayBeforeLabel(
-                state.customer.nextDeliveryDate
-              )}</strong> (the day before delivery)`
-            : " the day before delivery"
-        }.`;
+        const deadline = state.customer.nextDeliveryDate
+          ? ` on ${dayBeforeLabel(
+              state.customer.nextDeliveryDate
+            )} (the day before delivery)`
+          : " the day before delivery";
+        els.cutoffNotice.innerHTML = `
+          <p class="notice-primary"><strong>Orders must be submitted by <span class="notice-time">5:00 PM</span>${deadline}</strong></p>
+        `;
       }
     } else if (isAdmin && els.customerName) {
       els.customerName.textContent = "Select a customer";
@@ -685,12 +692,15 @@
 
     if (!lines.length) {
       const isNew = state.isNewCustomer || state.orderMode === "new";
+      const hasStaffPicks = staffPickProducts().length > 0;
       els.cartList.innerHTML = `
         <div class="empty">
           <strong>${isNew ? "Your cart is empty" : "No items yet"}</strong>
           ${
             isNew
-              ? "Browse products below or tap a Staff Pick to start your first order."
+              ? hasStaffPicks
+                ? "Browse products or tap a Staff Pick to start your order."
+                : "Browse products to start your order."
               : "Your previous order will appear here when available. Add products below."
           }
         </div>`;

@@ -6,14 +6,14 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#f15a24" />
+    <meta name="theme-color" content="#5a3c6e" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>DisFruta — Your Weekly Order</title>
     <meta
       name="description"
       content="Review and modify your DisFruta recurring order."
     />
-    <link rel="icon" href="./assets/logo-300x238.png" type="image/png" />
+    <link rel="icon" href="./assets/favicon.png" type="image/png" />
     <link rel="stylesheet" href="./assets/css/styles.css" />
   </head>
   <body>
@@ -21,17 +21,15 @@
 
     <header class="site-header">
       <div class="site-header-inner">
+        <h1 class="sr-only">DisFruta</h1>
         <img
           class="logo"
-          src="./assets/logo-300x238.png"
-          alt="DisFruta"
-          width="64"
-          height="51"
+          src="./assets/logo-header.png"
+          alt="DisFruta — Enjoy Freshness Delivered"
+          width="160"
+          height="98"
         />
-        <div class="header-copy">
-          <h1>DisFruta</h1>
-          <p class="header-meta">Wholesale · Fresh · On time</p>
-        </div>
+        <span class="header-spacer" aria-hidden="true"></span>
         <span class="badge" id="headerBadge">Weekly order</span>
       </div>
     </header>
@@ -46,10 +44,10 @@
     <div id="landing" class="landing hidden">
       <img
         class="logo-lg"
-        src="./assets/logo-300x238.png"
-        alt="DisFruta"
-        width="120"
-        height="95"
+        src="./assets/logo.png"
+        alt="DisFruta — Enjoy Freshness Delivered"
+        width="240"
+        height="148"
       />
       <h1>Order with DisFruta</h1>
       <p>
@@ -121,10 +119,10 @@
         Thank you! Your order is in. You’ll get a confirmation text shortly.
       </p>
       <img
-        src="./assets/logo-300x238.png"
+        src="./assets/logo.png"
         alt=""
-        width="80"
-        height="63"
+        width="140"
+        height="86"
         style="margin: 0 auto; opacity: 0.9"
       />
     </div>
@@ -162,9 +160,10 @@
           <h3 id="contactHeading">Your business details</h3>
         </div>
         <p class="section-sub">
-          We’ll use this to set up your account and confirm the order. Fields
-          marked * are required. If you already order with DisFruta, use the
-          link above to look up your account instead.
+          We’ll use this to set up your account and confirm the order.<br />
+          If you already order with DisFruta, use the link above to look up
+          your account instead.<br /><br />
+          <span class="section-sub-note">Fields marked * are required</span>
         </p>
         <div class="card contact-card">
           <div class="field-grid">
@@ -230,8 +229,13 @@
       </section>
 
       <div class="notice" id="cutoffNotice" role="note">
-        Orders must be submitted by <strong>5:00 PM</strong> the day before
-        delivery.
+        <p class="notice-primary">
+          <strong
+            >Orders must be submitted by
+            <span class="notice-time">5:00 PM</span> the day before
+            delivery</strong
+          >
+        </p>
       </div>
 
       <!-- Decline entire order period (returning customers) -->

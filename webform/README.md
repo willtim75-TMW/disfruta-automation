@@ -2,8 +2,8 @@
 
 Clean, personalized, mobile-friendly recurring order form for DisFruta customers.
 
-Implements the layout in `docs/fillout-form.md`, branded with the logo color
-palette (orange, magenta, purple, green, blue), and built to post orders to
+Implements the layout in `docs/fillout-form.md`, branded with the disfruta logo
+palette (purple, pink, magenta, yellow, green), and built to post orders to
 **Make.com** for **QuickBooks Online** draft invoices.
 
 ## Quick start (local)
@@ -94,16 +94,22 @@ without Make credentials.
 
 ## Brand
 
+Palette from the `disfruta` wordmark logo (deep purple + fruit accents):
+
 | Token | Color | Use |
 |-------|-------|-----|
-| Orange | `#f15a24` | Primary CTA, accents (logo splash) |
-| Magenta | `#c73a8a` | Remove / secondary accent |
-| Purple | `#8b2f9a` | Promo tags, admin |
-| Green | `#2d9b45` | Add buttons, success |
-| Blue | `#1e6bb8` | Links |
-| Charcoal | `#2a2a2a` | Text |
+| Purple | `#5a3c6e` | Primary CTA, links, wordmark |
+| Pink | `#e65a82` | Accents, hero kicker |
+| Magenta | `#b4468c` | Secondary accent |
+| Yellow | `#fabe50` | Notices, brand bar |
+| Green | `#82be46` | Add buttons, success, leaves |
+| Charcoal | `#2a2430` | Text |
 
-Logo: `../Logo/logo-300x238.png` (copied to `assets/` for the form).
+Logo assets (from `assets/DISFRUTA_LOGO.pdf`):
+
+- `assets/logo.png` — main / landing
+- `assets/logo-header.png` — sticky header
+- `assets/favicon.png` — favicon
 
 ## Files
 
@@ -112,7 +118,10 @@ webform/
   index.html          Customer order form
   admin.html          Admin order-on-behalf
   assets/css/styles.css
-  assets/logo-300x238.png
+  assets/logo.png
+  assets/logo-header.png
+  assets/favicon.png
+  assets/DISFRUTA_LOGO.pdf
   js/config.js        Webhook + Google Sheets config
   js/sheets.js        Sheets CSV/API loader + column mapping
   js/app.js           Cart, search, submit

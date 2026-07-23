@@ -6,9 +6,9 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#8b2f9a" />
+    <meta name="theme-color" content="#5a3c6e" />
     <title>DisFruta — Admin Order Entry</title>
-    <link rel="icon" href="./assets/logo-300x238.png" type="image/png" />
+    <link rel="icon" href="./assets/favicon.png" type="image/png" />
     <link rel="stylesheet" href="./assets/css/styles.css" />
   </head>
   <body data-mode="admin">
@@ -17,17 +17,15 @@
 
     <header class="site-header">
       <div class="site-header-inner">
+        <h1 class="sr-only">DisFruta Admin</h1>
         <img
           class="logo"
-          src="./assets/logo-300x238.png"
-          alt="DisFruta"
-          width="64"
-          height="51"
+          src="./assets/logo-header.png"
+          alt="DisFruta — Enjoy Freshness Delivered"
+          width="160"
+          height="98"
         />
-        <div class="header-copy">
-          <h1>DisFruta Admin</h1>
-          <p class="header-meta">QuickBooks customer → draft invoice via Make</p>
-        </div>
+        <span class="header-spacer" aria-hidden="true"></span>
         <a class="btn btn-secondary" href="./index.html" style="min-height: 36px; padding: 6px 12px; font-size: 0.8rem"
           >Customer view</a
         >
@@ -83,8 +81,13 @@
       </section>
 
       <div class="notice" id="cutoffNotice" role="note">
-        Orders must be submitted by <strong>5:00 PM</strong> the day before
-        delivery.
+        <p class="notice-primary">
+          <strong
+            >Orders must be submitted by
+            <span class="notice-time">5:00 PM</span> the day before
+            delivery</strong
+          >
+        </p>
       </div>
 
       <section class="section" aria-labelledby="cartHeading">
