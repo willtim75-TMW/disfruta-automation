@@ -2,7 +2,20 @@
 
 **Make.com is the system hub.** All of the following are Make scenarios (or modules inside scenarios). The webform only POSTs the order JSON to a Custom Webhook.
 
-Detail for the order webhook → QBO path: [make/order-processing.md](../make/order-processing.md).
+Detail for the order webhook → QBO path: (../make/order-processing.md).
+
+## System Flow Overview
+
+1. **Existing customers** receive personalized form link via Twilio text.  
+2. **New customers** receive form link via text, verbally, card, or website.  
+3. Customer submits form → data sent to Make.com webhook.  
+4. Make.com processes the data and:  
+   - Creates invoice in QuickBooks  
+   - Saves order to Google Sheets  
+   - Sends confirmation text via Twilio  
+   - Notifies owners if customer added notes  
+   - Notifies owners of any new customer signups  
+5. **Daily trigger** in Make.com sends out existing customer links + reminders, and generates the driver pick list from Google Sheets.
 
 ## Core workflows
 
@@ -23,7 +36,7 @@ https://YOUR_HOST/webform/index.html?customerId={{qbo_id}}&deliveryDate={{date}}
 - **Skip** if **Orders** log has `status` ∈ (`invoiced`, `submitted`, `declined`) for that customer + `delivery_date`.  
 - Sends reminders until **submit**, **decline**, or **5:00 PM** day-before-delivery cutoff.  
 - Cadence: Day-2 ×2, Day-1 ×2 including final call (~4pm).  
-- **Exact SMS text:** [sms-copy.md](sms-copy.md) §1–2.
+- **Exact SMS text:** (sms-copy.md) §1–2.
 
 ### 3. Order processing (webhook)
 
@@ -32,7 +45,7 @@ Triggered by webform `makeWebhookUrl`:
 1. Receive JSON (`version`, `declined`, `isNewCustomer`, `customer`, `order`, `quickbooks`, `notes`).  
 2. Generate `order_id`; append **Orders** row (`status=received` or `declined`).  
 3. Router:
-   - **Declined** → `status=declined`; no invoice; SMS [sms-copy.md](sms-copy.md) §3 (+ optional owner §7).  
+   - **Declined** → `status=declined`; no invoice; SMS (sms-copy.md) §3 (+ optional owner §7).  
    - **New customer** → Create QBO Customer → Create Invoice → append Clients.  
    - **Returning** → Create Invoice with `customer.qboCustomerId`.  
 4. On success: set Orders `status=invoiced`, store `qbo_invoice_id` / `qbo_doc_number`; append **Order Lines**; replace **Previous**; append **Notes** if non-empty.  
@@ -40,12 +53,12 @@ Triggered by webform `makeWebhookUrl`:
 6. Twilio customer confirmation §4 or §5; owner alert §6.  
 7. Delivery Reports: append or rebuild for `delivery_date`.
 
-Schemas: [data-schema.md](data-schema.md) · QBO: [integrations/quickbooks/invoice-mapping.md](../integrations/quickbooks/invoice-mapping.md).
+Schemas: (data-schema.md) · QBO: (../integrations/quickbooks/invoice-mapping.md).
 
 ### 4. Text message replies
 
 - Twilio number receives inbound SMS.  
-- If body is an exact decline keyword ([sms-copy.md](sms-copy.md) § keywords) → same as form decline (Orders + §3).  
+- If body is an exact decline keyword ( (sms-copy.md) § keywords) → same as form decline (Orders + §3).  
 - Else forward to owner with template §8.  
 - Owner may enter the order via **admin.html** if the customer did not use the form.
 
@@ -66,17 +79,14 @@ Schemas: [data-schema.md](data-schema.md) · QBO: [integrations/quickbooks/invoi
 
 ## SMS copy
 
-All customer and owner texts: **[sms-copy.md](sms-copy.md)**.
+All customer and owner texts: ** (sms-copy.md)**.
 
 ## Configuration checklist
 
 - [ ] Make Custom Webhook URL in `webform/js/config.js` → `makeWebhookUrl`  
-- [ ] Make QBO connection (OAuth)  
 - [ ] Make Twilio connection  
-- [ ] Make Google Sheets connection (same workbook as form)  
 - [ ] **Orders** + **Order Lines** tabs created (import CSV templates)  
 - [ ] Products have **qbo_item_id** for every active item  
 - [ ] Clients have **quickbooks_id** + phone for SMS/lookup  
-- [ ] Previous populated for recurring pre-fill  
-- [ ] Twilio templates pasted from [sms-copy.md](sms-copy.md)  
+- [ ] Twilio templates pasted from (sms-copy.md)  
 - [ ] `demoMode: false` on the form when going live  
