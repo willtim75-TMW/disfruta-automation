@@ -25,7 +25,9 @@
         "sku": "DF-0044",
         "quantity": 2
       }
-    ]
+    ],
+    "preferredLanguage": "es",
+    "language": "es"
   },
   {
     "qboCustomerId": "31",
@@ -49,7 +51,9 @@
         "sku": "DF-0033",
         "quantity": 4
       }
-    ]
+    ],
+    "preferredLanguage": "en",
+    "language": "en"
   },
   {
     "qboCustomerId": "48",
@@ -73,6 +77,8 @@
         "sku": "DF-0013",
         "quantity": 15
       }
-    ]
+    ],
+    "preferredLanguage": "es",
+    "language": "es"
   }
 ]

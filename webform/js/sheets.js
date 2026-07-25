@@ -83,6 +83,23 @@
       "delivery date",
       "next date",
     ],
+    preferredLanguage: [
+      "preferred language",
+      "preferred_language",
+      "language",
+      "lang",
+      "idioma",
+      "locale",
+    ],
+    pin: [
+      "pin",
+      "access pin",
+      "access_pin",
+      "customer pin",
+      "password",
+      "passcode",
+      "order pin",
+    ],
     defaultQuantity: [
       "default quantity",
       "quantity",
@@ -91,6 +108,38 @@
       "prev qty",
     ],
   };
+
+  /** Normalize Clients sheet language → "en" | "es" (empty if unknown). */
+  function normalizeLanguage(raw) {
+    const v = String(raw || "")
+      .trim()
+      .toLowerCase();
+    if (!v) return "";
+    if (
+      v === "es" ||
+      v === "es-us" ||
+      v === "es-mx" ||
+      v === "spanish" ||
+      v === "español" ||
+      v === "espanol" ||
+      v.startsWith("es-") ||
+      v.startsWith("es_")
+    ) {
+      return "es";
+    }
+    if (
+      v === "en" ||
+      v === "en-us" ||
+      v === "english" ||
+      v === "inglés" ||
+      v === "ingles" ||
+      v.startsWith("en-") ||
+      v.startsWith("en_")
+    ) {
+      return "en";
+    }
+    return "";
+  }
 
   function normalizeHeader(h) {
     return String(h || "")
@@ -507,6 +556,9 @@
     const name = pick(row, "customerName") || pick(row, "name");
     if (!qboCustomerId && !name) return null;
     const activeRaw = pick(row, "active");
+    const preferredLanguage =
+      normalizeLanguage(pick(row, "preferredLanguage")) || "en";
+    const pin = String(pick(row, "pin") || "").trim();
     return {
       qboCustomerId: String(qboCustomerId || ""),
       name: String(name || `Customer ${qboCustomerId}`),
@@ -516,6 +568,10 @@
       dayOfWeek: String(pick(row, "dayOfWeek") || ""),
       lastOrderDate: String(pick(row, "lastOrderDate") || ""),
       nextDeliveryDate: String(pick(row, "nextDeliveryDate") || ""),
+      preferredLanguage,
+      language: preferredLanguage,
+      pin,
+      accessPin: pin,
       active: activeRaw === "" ? true : truthy(activeRaw),
       notes: String(pick(row, "notes") || ""),
       previousOrder: [],
@@ -867,6 +923,18 @@
                 dayOfWeek: c.dayOfWeek || "",
                 lastOrderDate: c.lastOrderDate || "",
                 nextDeliveryDate: c.nextDeliveryDate || "",
+                preferredLanguage:
+                  normalizeLanguage(
+                    c.preferredLanguage || c.language || c.lang || ""
+                  ) || "en",
+                language:
+                  normalizeLanguage(
+                    c.preferredLanguage || c.language || c.lang || ""
+                  ) || "en",
+                pin: String(c.pin || c.accessPin || c.password || "").trim(),
+                accessPin: String(
+                  c.pin || c.accessPin || c.password || ""
+                ).trim(),
                 active: c.active !== false,
                 notes: c.notes || "",
                 previousOrder: c.previousOrder || [],
@@ -879,19 +947,30 @@
       );
     } else {
       // ensure consistent shape
-      clients = (clients || []).map((c) => ({
-        qboCustomerId: String(c.qboCustomerId || c.id || ""),
-        name: c.name || c.customerName || "",
-        phone: c.phone || "",
-        email: c.email || "",
-        frequency: c.frequency || "",
-        dayOfWeek: c.dayOfWeek || "",
-        lastOrderDate: c.lastOrderDate || "",
-        nextDeliveryDate: c.nextDeliveryDate || "",
-        active: c.active !== false,
-        notes: c.notes || "",
-        previousOrder: c.previousOrder || [],
-      }));
+      clients = (clients || []).map((c) => {
+        const preferredLanguage =
+          normalizeLanguage(
+            c.preferredLanguage || c.language || c.lang || ""
+          ) || "en";
+        const pin = String(c.pin || c.accessPin || c.password || "").trim();
+        return {
+          qboCustomerId: String(c.qboCustomerId || c.id || ""),
+          name: c.name || c.customerName || "",
+          phone: c.phone || "",
+          email: c.email || "",
+          frequency: c.frequency || "",
+          dayOfWeek: c.dayOfWeek || "",
+          lastOrderDate: c.lastOrderDate || "",
+          nextDeliveryDate: c.nextDeliveryDate || "",
+          preferredLanguage,
+          language: preferredLanguage,
+          pin,
+          accessPin: pin,
+          active: c.active !== false,
+          notes: c.notes || "",
+          previousOrder: c.previousOrder || [],
+        };
+      });
     }
 
     clients = clients.filter((c) => c.active !== false);

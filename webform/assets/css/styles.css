@@ -127,6 +127,30 @@ a {
   display: block;
 }
 
+/* Clickable logo → home / landing */
+.logo-home {
+  display: block;
+  flex-shrink: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  line-height: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.logo-home:hover {
+  opacity: 0.92;
+}
+
+.logo-home:focus-visible {
+  outline: 2px solid var(--pink);
+  outline-offset: 3px;
+}
+
 .header-spacer {
   flex: 1;
   min-width: 0;
@@ -136,6 +160,53 @@ a {
   margin: 2px 0 0;
   font-size: 0.85rem;
   color: var(--muted);
+}
+
+/* EN / ES language switcher */
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.lang-btn {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  min-height: 28px;
+}
+
+.lang-btn + .lang-btn {
+  border-left: 1px solid var(--border);
+}
+
+.lang-btn:hover {
+  color: var(--purple);
+  background: rgba(90, 60, 110, 0.06);
+}
+
+.lang-btn.active {
+  color: #fff;
+  background: var(--purple);
+}
+
+.lang-btn:focus-visible {
+  outline: 2px solid var(--pink);
+  outline-offset: 1px;
+  z-index: 1;
 }
 
 .badge {
@@ -747,6 +818,15 @@ a {
 /* Switch new ↔ returning entry mode */
 .mode-switch {
   margin: 12px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.mode-switch-sep {
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .btn-link {
@@ -766,6 +846,41 @@ a {
 
 .btn-link:hover {
   color: var(--magenta);
+}
+
+/* Admin / customer unlock panels */
+.auth-gate {
+  max-width: 420px;
+}
+
+.auth-section .contact-card {
+  padding-bottom: 16px;
+}
+
+.admin-phone-confirm {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.admin-phone-confirm input {
+  width: 100%;
+  min-height: var(--touch);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: #fff;
+  margin-bottom: 8px;
+}
+
+.admin-phone-confirm input:focus {
+  outline: none;
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px rgba(90, 60, 110, 0.15);
+}
+
+.admin-phone-confirm .btn {
+  margin-top: 4px;
 }
 
 /* Decline entire order period */

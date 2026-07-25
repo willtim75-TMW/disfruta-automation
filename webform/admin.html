@@ -12,21 +12,34 @@
     <link rel="stylesheet" href="./assets/css/styles.css" />
   </head>
   <body data-mode="admin">
-    <div class="admin-banner">ADMIN · Order on behalf of customer</div>
+    <div class="admin-banner" data-i18n="admin.banner">ADMIN · Order on behalf of customer</div>
     <div class="brand-bar" aria-hidden="true"></div>
 
     <header class="site-header">
       <div class="site-header-inner">
         <h1 class="sr-only">DisFruta Admin</h1>
-        <img
-          class="logo"
-          src="./assets/logo-header.png"
-          alt="DisFruta — Enjoy Freshness Delivered"
-          width="160"
-          height="98"
-        />
+        <a class="logo-home" href="./index.html" data-i18n-aria-label="header.logo_home" aria-label="DisFruta home" title="Customer form">
+          <img
+            class="logo"
+            src="./assets/logo-header.png"
+            alt="DisFruta — Enjoy Freshness Delivered"
+            width="160"
+            height="98"
+          />
+        </a>
         <span class="header-spacer" aria-hidden="true"></span>
-        <a class="btn btn-secondary" href="./index.html" style="min-height: 36px; padding: 6px 12px; font-size: 0.8rem"
+        <!--
+          Language toggle (disabled): UI follows the selected customer's
+          preferred language from the Clients sheet. Uncomment for manual override.
+        <div class="lang-switch" role="group" data-i18n-aria-label="header.lang_label" aria-label="Language">
+          <button type="button" class="lang-btn" data-set-lang="en" aria-pressed="true">EN</button>
+          <button type="button" class="lang-btn" data-set-lang="es" aria-pressed="false">ES</button>
+        </div>
+        -->
+        <button type="button" class="btn btn-secondary hidden" id="adminLogoutBtn" style="min-height: 36px; padding: 6px 12px; font-size: 0.8rem" data-i18n="admin.logout">
+          Sign out
+        </button>
+        <a class="btn btn-secondary" href="./index.html" style="min-height: 36px; padding: 6px 12px; font-size: 0.8rem" data-i18n="header.customer_view"
           >Customer view</a
         >
       </div>
@@ -34,55 +47,104 @@
 
     <div id="loadingScreen" class="state-screen">
       <div class="spinner" aria-hidden="true"></div>
-      <h2>Loading catalog…</h2>
-      <p>Customers and products from your order system.</p>
+      <h2 data-i18n="loading.title_admin">Loading catalog…</h2>
+      <p data-i18n="loading.body_admin">Customers and products from your order system.</p>
     </div>
 
     <div id="landing" class="hidden"></div>
 
+    <!-- Owner login gate -->
+    <div id="adminGate" class="landing auth-gate hidden">
+      <img
+        class="logo-lg"
+        src="./assets/logo.png"
+        alt=""
+        width="200"
+        height="124"
+      />
+      <h1 data-i18n="admin.gate_title">Admin sign-in</h1>
+      <p data-i18n="admin.gate_body">
+        Owners only. Sign in with your DisFruta username and password, then
+        confirm a customer’s phone number to place an order on their behalf.
+      </p>
+      <div class="landing-panel">
+        <label class="field-label" for="adminUsername" data-i18n="admin.username">Username</label>
+        <input id="adminUsername" type="text" autocomplete="username" />
+        <label class="field-label" for="adminPassword" data-i18n="admin.password" style="margin-top: 10px">Password</label>
+        <input id="adminPassword" type="password" autocomplete="current-password" />
+        <p class="landing-hint" id="adminGateHint"></p>
+        <button type="button" class="btn btn-primary btn-block" id="adminLoginBtn" data-i18n="admin.sign_in">
+          Sign in
+        </button>
+      </div>
+      <p class="header-meta" style="margin-top: 20px">
+        <a href="./index.html" data-i18n="header.customer_view">Customer view</a>
+      </p>
+    </div>
+
     <div id="errorScreen" class="state-screen error hidden">
       <div class="icon" aria-hidden="true">!</div>
-      <h2>Submission failed</h2>
-      <p data-error-detail>Something went wrong.</p>
-      <button type="button" class="btn btn-primary" onclick="DisfrutaOrder.retry()">
+      <h2 data-i18n="error.title_admin">Submission failed</h2>
+      <p data-error-detail data-i18n="error.body_admin">Something went wrong.</p>
+      <button type="button" class="btn btn-primary" onclick="DisfrutaOrder.retry()" data-i18n="error.retry">
         Try again
       </button>
     </div>
 
     <div id="successScreen" class="state-screen success hidden">
       <div class="icon" aria-hidden="true">✓</div>
-      <h2>Order submitted</h2>
-      <p data-success-detail>
+      <h2 data-i18n="success.title_admin">Order submitted</h2>
+      <p data-success-detail data-i18n="success.body_admin">
         Order was sent to Make.com for QuickBooks draft invoice creation.
       </p>
-      <a class="btn btn-primary" href="./admin.html">Enter another order</a>
+      <a class="btn btn-primary" href="./admin.html" data-i18n="success.another">Enter another order</a>
     </div>
 
-    <main id="main" class="app">
+    <main id="main" class="app hidden">
       <section class="admin-panel">
-        <label for="adminSelect">Customer (QuickBooks Online ID → Name)</label>
+        <label for="adminSelect" data-i18n="admin.select_label">Customer (QuickBooks Online ID → Name)</label>
         <select id="adminSelect" aria-describedby="adminHelp">
-          <option value="">— Choose customer —</option>
+          <option value="" data-i18n-value="admin.select_placeholder">— Choose customer —</option>
         </select>
-        <p id="adminHelp" class="section-sub" style="margin: 8px 0 0">
+        <p id="adminHelp" class="section-sub" style="margin: 8px 0 0" data-i18n="admin.help">
           Selecting a customer loads their header and previous order so you can
           order on their behalf (e.g. when they text instead of using the form).
         </p>
+        <div id="adminPhoneConfirm" class="admin-phone-confirm hidden">
+          <label class="field-label" for="adminCustomerPhone" data-i18n="admin.customer_phone"
+            >Customer phone on file</label
+          >
+          <input
+            id="adminCustomerPhone"
+            type="tel"
+            inputmode="tel"
+            autocomplete="tel"
+            placeholder="(555) 123-4567"
+            data-i18n-placeholder="landing.phone_placeholder"
+          />
+          <p class="section-sub" style="margin: 6px 0 0" data-i18n="admin.customer_phone_help">
+            Enter the phone number from the Clients sheet to unlock this account.
+          </p>
+          <p class="landing-hint" id="adminPhoneHint"></p>
+          <button type="button" class="btn btn-primary" id="adminUnlockCustomerBtn" data-i18n="admin.unlock_customer">
+            Unlock customer
+          </button>
+        </div>
       </section>
 
       <section class="hero" aria-labelledby="heroTitle">
-        <p class="hero-kicker">Ordering for</p>
-        <h2 id="heroTitle"><span id="customerName">Select a customer</span></h2>
-        <p>What would you like this week?</p>
+        <p class="hero-kicker" data-i18n="hero.kicker_ordering">Ordering for</p>
+        <h2 id="heroTitle"><span id="customerName" data-i18n="hero.select_customer">Select a customer</span></h2>
+        <p id="heroSubtitle" data-i18n="hero.subtitle">What would you like this week?</p>
         <div class="delivery-pill">
-          Next delivery:
+          <span data-i18n="hero.delivery_prefix">Next delivery:</span>
           <span id="deliveryDate">—</span>
         </div>
       </section>
 
-      <div class="notice" id="cutoffNotice" role="note">
+      <div class="notice" id="cutoffNotice" role="note" data-order-body>
         <p class="notice-primary">
-          <strong
+          <strong data-i18n-html="notice.cutoff"
             >Orders must be submitted by
             <span class="notice-time">5:00 PM</span> the day before
             delivery</strong
@@ -90,56 +152,58 @@
         </p>
       </div>
 
-      <section class="section" aria-labelledby="cartHeading">
+      <section class="section" aria-labelledby="cartHeading" data-order-body>
         <div class="section-head">
-          <h3 id="cartHeading">Your Previous Order</h3>
+          <h3 id="cartHeading" data-i18n="cart.heading_previous">Your Previous Order</h3>
           <span class="count" id="cartCount">0 items</span>
         </div>
         <div class="card" id="cartList"></div>
       </section>
 
-      <section class="section hidden" id="promoSection" aria-labelledby="promoTitle">
+      <section class="section hidden" id="promoSection" aria-labelledby="promoTitle" data-order-body>
         <div class="section-head">
-          <h3 id="promoTitle">Staff Picks</h3>
+          <h3 id="promoTitle" data-i18n="promo.title">Staff Picks</h3>
         </div>
         <div class="promo-grid" id="promoGrid"></div>
       </section>
 
-      <section class="section" aria-labelledby="browseHeading">
+      <section class="section" aria-labelledby="browseHeading" data-order-body>
         <div class="section-head">
-          <h3 id="browseHeading">Add More Items</h3>
+          <h3 id="browseHeading" data-i18n="browse.heading">Add More Items</h3>
           <span class="count" id="browseCount">0 products</span>
         </div>
         <div class="search-wrap">
-          <label class="sr-only" for="searchInput">Search all products</label>
+          <label class="sr-only" for="searchInput" data-i18n="browse.search_label">Search all products</label>
           <input
             id="searchInput"
             type="search"
             placeholder="Search all products by name, SKU…"
+            data-i18n-placeholder="browse.search_ph"
             autocomplete="off"
           />
         </div>
-        <p class="search-scope-hint hidden" id="searchScopeHint" role="status">
+        <p class="search-scope-hint hidden" id="searchScopeHint" role="status" data-i18n-html="browse.scope_hint">
           Searching <strong>all products</strong> — category filter is paused
           while you type.
         </p>
         <div class="category-tabs" id="categoryTabs" role="tablist"></div>
         <div class="browse-toolbar hidden" id="browseToolbar">
           <span id="browseToolbarLabel"></span>
-          <button type="button" class="btn btn-add" id="addCategoryAllBtn">
+          <button type="button" class="btn btn-add" id="addCategoryAllBtn" data-i18n="browse.add_all">
             Add all in category
           </button>
         </div>
         <div class="card browse-list" id="browseList"></div>
       </section>
 
-      <section class="section notes" aria-labelledby="notesHeading">
+      <section class="section notes" aria-labelledby="notesHeading" data-order-body>
         <div class="section-head">
-          <h3 id="notesHeading">Special notes</h3>
+          <h3 id="notesHeading" data-i18n="notes.heading">Special notes</h3>
         </div>
         <textarea
           id="notesInput"
           placeholder="Notes from customer text / phone call"
+          data-i18n-placeholder="notes.ph_admin"
           maxlength="1000"
         ></textarea>
       </section>
@@ -148,31 +212,32 @@
         class="section decline-section hidden"
         id="declineSection"
         aria-labelledby="declineHeading"
+        data-order-body
       >
         <div class="decline-card">
           <div class="decline-copy">
-            <h3 id="declineHeading">Customer skipping this period?</h3>
-            <p>
+            <h3 id="declineHeading" data-i18n="decline.heading_admin">Customer skipping this period?</h3>
+            <p data-i18n="decline.body_admin">
               Record no delivery for this cycle — no invoice and stop reminders.
             </p>
           </div>
-          <button type="button" class="btn btn-decline" id="declineBtnTop">
+          <button type="button" class="btn btn-decline" id="declineBtnTop" data-i18n="decline.btn_admin">
             Decline period (no order)
           </button>
         </div>
       </section>
 
       <div class="secondary-actions hidden" id="declineFooter">
-        <button type="button" class="btn btn-ghost" id="declineBtn">
+        <button type="button" class="btn btn-ghost" id="declineBtn" data-i18n="decline.btn_admin">
           Decline period (no order)
         </button>
       </div>
     </main>
 
-    <div class="summary-bar" role="region" aria-label="Order summary">
+    <div class="summary-bar" role="region" data-i18n-aria-label="summary.label" aria-label="Order summary">
       <div class="summary-inner summary-inner-split">
         <div>
-          <p class="summary-total-label">Total</p>
+          <p class="summary-total-label" data-i18n="summary.total">Total</p>
           <p class="summary-total" id="summaryTotal">$0.00</p>
           <p class="summary-meta" id="summaryCount">0 items</p>
         </div>
@@ -181,10 +246,11 @@
             type="button"
             class="btn btn-secondary summary-decline hidden"
             id="declineBtnBar"
+            data-i18n="decline.btn_bar"
           >
             Skip period
           </button>
-          <button type="button" class="btn btn-primary" id="submitBtn" disabled>
+          <button type="button" class="btn btn-primary" id="submitBtn" disabled data-i18n="summary.submit">
             Submit Order
           </button>
         </div>
@@ -192,6 +258,8 @@
     </div>
 
     <script src="./js/config.js"></script>
+    <script src="./js/i18n.js"></script>
+    <script src="./js/auth.js"></script>
     <script src="./js/products-data.js"></script>
     <script src="./js/customers-data.js"></script>
     <script src="./js/sheets.js"></script>

@@ -21,6 +21,49 @@ Open:
 - New order direct: http://localhost:8080/?new=1  
 - Returning demo: http://localhost:8080/?customerId=24  
 - Admin: http://localhost:8080/admin.html  
+- Spanish via SMS-style link: http://localhost:8080/?customerId=24&lang=es  
+
+## Navigation
+
+- **Logo** (customer form) returns to the landing chooser (new vs existing).
+- New-customer path also has **← Back to start** and **Already a customer?**
+- Returning (phone lookup) has **← Back to start**.
+
+## Access control
+
+Configured in `js/config.js` → `auth` (logic in `js/auth.js`).
+
+| Surface | Protection |
+|---------|------------|
+| **Admin** (`admin.html`) | Owner **username + password**, then **customer phone** on file to unlock that account |
+| **Customer** | Optional **phone re-confirm** (`auth.customer.requirePhoneConfirm`) and/or **PIN** from Clients (`pin` / `access_pin`) when `requirePinIfSet` is true |
+
+Demo admin (change before production):
+
+- Username: `owner`
+- Password: `disfruta-admin`
+
+Browser-side gates are **not** full security. For production, also protect `admin.html` with Cloudflare Access, Netlify password, Basic Auth, or similar. Do not commit real passwords.
+
+## Language (EN / ES)
+
+Language is **per customer**, not a public toggle:
+
+| Who | How language is chosen |
+|-----|------------------------|
+| **Returning (SMS)** | Clients sheet `preferred_language`, or `?lang=es` / `?lang=en` on the link |
+| **Returning (phone)** | Clients sheet `preferred_language` |
+| **New customer** | One-time **Preferred language** field on the contact form |
+| **Admin** | Follows the selected customer’s preferred language |
+
+Header EN|ES toggle is commented out in HTML (kept for future debugging).
+
+Make.com should: store `customer.preferredLanguage` on new Clients rows, and
+append `&lang=es` (or `en`) on Twilio SMS links from the sheet.
+
+Product names stay as stored in the catalog; UI chrome is translated.
+Payloads include `customer.preferredLanguage` and `meta.lang`.
+Strings: `js/i18n.js`.
 
 Products load from `data/products.json` first (91 active items), then refresh from Google Sheets when the browser allows it.
 
@@ -122,7 +165,9 @@ webform/
   assets/logo-header.png
   assets/favicon.png
   assets/DISFRUTA_LOGO.pdf
-  js/config.js        Webhook + Google Sheets config
+  js/config.js        Webhook + Google Sheets + auth config
+  js/i18n.js          EN / ES UI strings
+  js/auth.js          Admin login + customer unlock helpers
   js/sheets.js        Sheets CSV/API loader + column mapping
   js/app.js           Cart, search, submit
   data/products.json  Demo fallback catalog

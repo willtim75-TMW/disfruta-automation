@@ -4,8 +4,9 @@
  * Make.com is the automation hub (makeWebhookUrl). See make/order-processing.md.
  *
  * Personalization URL (Twilio / Make SMS):
- *   index.html?customerId=24&deliveryDate=2026-07-15&token=optional
- * New customer: index.html  or  index.html?new=1
+ *   index.html?customerId=24&deliveryDate=2026-07-15&lang=es&token=optional
+ *   (lang should match Clients.preferred_language — form has no public toggle)
+ * New customer: index.html  or  index.html?new=1  (picks language on form)
  * Admin: admin.html
  *
  * Catalog: Google Sheets (config.googleSheets) + embedded js/products-data.js fallback.
@@ -113,6 +114,39 @@ window.DISFRUTA_CONFIG = {
   allowNewCustomers: true,
   // Returning customers can look up by phone (Clients sheet) when no SMS link
   allowPhoneLookup: true,
+
+  /**
+   * Access control (static host — see js/auth.js)
+   *
+   * Admin (admin.html):
+   *   Owner signs in with username + password, then confirms the customer's
+   *   phone on file before ordering on their behalf.
+   *
+   * Customers (index.html):
+   *   Optional phone re-confirm and/or PIN from the Clients sheet.
+   *
+   * Browser checks only deter casual access. For production, also put
+   * admin.html behind Cloudflare Access / Netlify password / Basic Auth.
+   * Change demo passwords before go-live; do not commit real secrets.
+   */
+  auth: {
+    admin: {
+      enabled: true,
+      sessionHours: 8,
+      // After owner login, require customer phone match before cart unlocks
+      requireCustomerPhone: true,
+      owners: [
+        // Demo only — replace before production
+        { username: "owner", password: "disfruta-admin" },
+      ],
+    },
+    customer: {
+      // SMS / deep-link: confirm phone on file before showing the order
+      requirePhoneConfirm: false,
+      // If Clients.pin / access_pin is set, require that PIN (+ phone)
+      requirePinIfSet: true,
+    },
+  },
 
   // Submitted payload version for Make.com routers
   payloadVersion: "1.1",

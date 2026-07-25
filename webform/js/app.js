@@ -10,6 +10,80 @@
   const cfg = window.DISFRUTA_CONFIG || {};
   const params = new URLSearchParams(window.location.search);
   const isAdmin = document.body.dataset.mode === "admin";
+  const I18n = window.DisfrutaI18n || null;
+  const Auth = window.DisfrutaAuth || null;
+
+  function t(key, vars) {
+    return I18n && typeof I18n.t === "function" ? I18n.t(key, vars) : key;
+  }
+  function tn(n, oneKey, manyKey, vars) {
+    if (I18n && typeof I18n.tn === "function") {
+      return I18n.tn(n, oneKey, manyKey, vars);
+    }
+    return Number(n) === 1 ? t(oneKey, { n, ...vars }) : t(manyKey, { n, ...vars });
+  }
+  function activeLocale() {
+    if (I18n && typeof I18n.getLocale === "function") return I18n.getLocale();
+    return cfg.locale || "en-US";
+  }
+  function catLabel(c) {
+    if (I18n && typeof I18n.categoryLabel === "function") {
+      return I18n.categoryLabel(c);
+    }
+    return c;
+  }
+  function catChip(c) {
+    if (I18n && typeof I18n.categoryChipShort === "function") {
+      return I18n.categoryChipShort(c);
+    }
+    return c;
+  }
+
+  /** Normalize language codes from sheet / form / URL → "en" | "es" */
+  function normalizeLang(raw) {
+    if (I18n && typeof I18n.normalizeLang === "function") {
+      return I18n.normalizeLang(raw) || "";
+    }
+    const v = String(raw || "")
+      .trim()
+      .toLowerCase();
+    if (v.startsWith("es")) return "es";
+    if (v.startsWith("en")) return "en";
+    return "";
+  }
+
+  /**
+   * Serve only the preferred language for the current session.
+   * Returning / admin: customer.preferredLanguage (or SMS ?lang=).
+   * New customer: contact.language from the one-time picker.
+   */
+  function applySessionLanguage(opts) {
+    if (!I18n) return;
+    const options = opts || {};
+    if (state.isNewCustomer || state.orderMode === "new") {
+      const lang =
+        normalizeLang(state.contact.language) ||
+        normalizeLang(params.get("lang")) ||
+        "en";
+      I18n.setLang(lang, {
+        source: "new-user",
+        persist: false,
+        updateUrl: false,
+        silent: options.silent !== false,
+        force: Boolean(options.force),
+      });
+      return;
+    }
+    if (state.customer) {
+      if (typeof I18n.applyCustomerLang === "function") {
+        I18n.applyCustomerLang(state.customer, {
+          source: options.source || "customer",
+          silent: options.silent !== false,
+          force: Boolean(options.force),
+        });
+      }
+    }
+  }
 
   const state = {
     products: [],
@@ -26,6 +100,7 @@
       email: "",
       deliveryDay: "",
       address: "",
+      language: "en",
     },
     cart: new Map(),
     category: "All",
@@ -36,13 +111,19 @@
     submitted: false,
     dataSources: {},
     catalogMeta: {},
+    /** Returning customer must pass phone/PIN gate before ordering */
+    awaitingCustomerUnlock: false,
+    /** Phone already verified via lookup — PIN-only gate may remain */
+    unlockPhonePreverified: false,
+    /** Admin: customer selected but phone not confirmed yet */
+    adminCustomerLocked: false,
   };
 
   const els = {};
 
   // ---------- utils ----------
   function money(n) {
-    return new Intl.NumberFormat(cfg.locale || "en-US", {
+    return new Intl.NumberFormat(activeLocale(), {
       style: "currency",
       currency: cfg.currency || "USD",
     }).format(Number(n) || 0);
@@ -52,7 +133,7 @@
     if (!iso) return "—";
     const d = new Date(iso + (iso.length === 10 ? "T12:00:00" : ""));
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString(cfg.locale || "en-US", {
+    return d.toLocaleDateString(activeLocale(), {
       weekday: "long",
       month: "short",
       day: "numeric",
@@ -60,14 +141,27 @@
   }
 
   function dayBeforeLabel(iso) {
-    if (!iso) return "the day before delivery";
+    if (!iso) return t("notice.day_before");
     const d = new Date(iso + "T12:00:00");
     d.setDate(d.getDate() - 1);
-    return d.toLocaleDateString(cfg.locale || "en-US", {
+    return d.toLocaleDateString(activeLocale(), {
       weekday: "long",
       month: "short",
       day: "numeric",
     });
+  }
+
+  /** Display label for English weekday values stored in sheet / form */
+  function weekdayLabel(day) {
+    const key = {
+      Monday: "contact.day_mon",
+      Tuesday: "contact.day_tue",
+      Wednesday: "contact.day_wed",
+      Thursday: "contact.day_thu",
+      Friday: "contact.day_fri",
+      Saturday: "contact.day_sat",
+    }[String(day || "").trim()];
+    return key ? t(key) : day;
   }
 
   function toast(msg) {
@@ -200,6 +294,8 @@
   function startNewCustomer() {
     state.orderMode = "new";
     state.isNewCustomer = true;
+    const initialLang =
+      normalizeLang(params.get("lang") || params.get("locale")) || "en";
     state.customer = {
       qboCustomerId: "",
       name: "",
@@ -209,6 +305,8 @@
       dayOfWeek: "",
       nextDeliveryDate:
         params.get("deliveryDate") || params.get("nextDelivery") || "",
+      preferredLanguage: initialLang,
+      language: initialLang,
       previousOrder: [],
       active: true,
       isNew: true,
@@ -221,8 +319,10 @@
       email: params.get("email") || "",
       deliveryDay: params.get("deliveryDay") || params.get("day") || "",
       address: params.get("address") || "",
+      language: initialLang,
     };
     syncContactToCustomer();
+    applySessionLanguage({ silent: true, source: "new-user" });
   }
 
   /**
@@ -238,29 +338,59 @@
     state.notes = "";
     state.search = "";
     state.category = "All";
+    state.awaitingCustomerUnlock = false;
+    state.unlockPhonePreverified = false;
+    state.adminCustomerLocked = false;
     state.contact = {
       name: "",
       phone: "",
       email: "",
       deliveryDay: "",
       address: "",
+      language: normalizeLang(params.get("lang")) || "en",
     };
     if (els.notesInput) els.notesInput.value = "";
     if (els.searchInput) els.searchInput.value = "";
     writeContactFields();
-    // Drop forced ?new=1 so landing doesn't auto-reenter new mode
+    // Landing uses default/URL language only (no customer preference yet)
+    if (I18n) {
+      I18n.setLang(state.contact.language, {
+        source: "landing",
+        silent: true,
+        persist: false,
+        updateUrl: false,
+      });
+    }
+    // Drop deep-link params so landing doesn't auto-reenter new/returning mode
     try {
       const url = new URL(window.location.href);
-      if (url.searchParams.has("new") || url.searchParams.get("mode") === "new") {
-        url.searchParams.delete("new");
-        if (url.searchParams.get("mode") === "new") {
-          url.searchParams.delete("mode");
+      let dirty = false;
+      [
+        "new",
+        "mode",
+        "type",
+        "customerId",
+        "qboId",
+        "id",
+        "deliveryDate",
+        "nextDelivery",
+      ].forEach((key) => {
+        if (url.searchParams.has(key)) {
+          url.searchParams.delete(key);
+          dirty = true;
         }
-        if (url.searchParams.get("type") === "new") {
-          url.searchParams.delete("type");
-        }
-        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      });
+      // Keep lang / token if present
+      if (dirty) {
+        window.history.replaceState(
+          {},
+          "",
+          url.pathname + url.search + url.hash
+        );
       }
+      // Refresh params snapshot used by renderShell (customerId checks)
+      for (const k of [...params.keys()]) params.delete(k);
+      url.searchParams.forEach((v, k) => params.set(k, v));
     } catch (_) {
       /* ignore */
     }
@@ -283,7 +413,7 @@
   /** From new-customer path → returning phone lookup */
   function switchToReturningLookup() {
     resetToLanding({ openReturning: true });
-    toast("Look up your account with the phone on file");
+    toast(t("toast.lookup_account"));
   }
 
   function startReturningFromId(customerId) {
@@ -295,6 +425,8 @@
     if (!customer) {
       // Link still works if Clients sheet is incomplete — trust Make.com params
       const n = params.get("name") || params.get("customerName");
+      const lang =
+        normalizeLang(params.get("lang") || params.get("locale")) || "en";
       customer = {
         qboCustomerId: String(customerId),
         name: n || `Customer #${customerId}`,
@@ -304,6 +436,8 @@
         dayOfWeek: "",
         nextDeliveryDate:
           params.get("deliveryDate") || params.get("nextDelivery") || "",
+        preferredLanguage: lang,
+        language: lang,
         previousOrder: [],
         active: true,
       };
@@ -313,16 +447,34 @@
     if (d) customer.nextDeliveryDate = d;
     const n = params.get("name") || params.get("customerName");
     if (n) customer.name = n;
+    // SMS can still override if sheet language is empty / Make passes lang
+    const urlLang = normalizeLang(params.get("lang") || params.get("locale"));
+    if (urlLang && !normalizeLang(customer.preferredLanguage || customer.language)) {
+      customer.preferredLanguage = urlLang;
+      customer.language = urlLang;
+    }
 
     state.customer = customer;
-    seedCartFromPrevious(customer);
+    evaluateCustomerUnlock(customer, { phoneVerified: false });
+    if (!state.awaitingCustomerUnlock) {
+      seedCartFromPrevious(customer);
+    } else {
+      state.cart.clear();
+    }
+    applySessionLanguage({ silent: true, source: "customer-link" });
   }
 
-  function startReturningCustomer(customer) {
+  function startReturningCustomer(customer, opts) {
     state.orderMode = "returning";
     state.isNewCustomer = false;
     state.customer = customer;
-    seedCartFromPrevious(customer);
+    evaluateCustomerUnlock(customer, opts || { phoneVerified: true });
+    if (!state.awaitingCustomerUnlock) {
+      seedCartFromPrevious(customer);
+    } else {
+      state.cart.clear();
+    }
+    applySessionLanguage({ silent: true, source: "customer-lookup" });
   }
 
   function resolveProduct(line) {
@@ -354,6 +506,9 @@
     state.customer.email = state.contact.email.trim();
     state.customer.dayOfWeek = state.contact.deliveryDay.trim();
     state.customer.address = state.contact.address.trim();
+    const lang = normalizeLang(state.contact.language) || "en";
+    state.customer.preferredLanguage = lang;
+    state.customer.language = lang;
   }
 
   function readContactFields() {
@@ -363,6 +518,10 @@
       email: (els.contactEmail?.value || "").trim(),
       deliveryDay: (els.contactDeliveryDay?.value || "").trim(),
       address: (els.contactAddress?.value || "").trim(),
+      language:
+        normalizeLang(els.contactLanguage?.value) ||
+        normalizeLang(state.contact.language) ||
+        "en",
     };
     syncContactToCustomer();
   }
@@ -375,6 +534,9 @@
       els.contactDeliveryDay.value = state.contact.deliveryDay || "";
     if (els.contactAddress)
       els.contactAddress.value = state.contact.address || "";
+    if (els.contactLanguage)
+      els.contactLanguage.value =
+        normalizeLang(state.contact.language) || "en";
   }
 
   function validateNewCustomerContact() {
@@ -454,12 +616,65 @@
   }
 
   function hasActiveSession() {
+    if (isAdmin) {
+      // Admin page is "active" once owner is signed in (or auth disabled)
+      return isAdminOwnerSignedIn();
+    }
     return (
-      isAdmin ||
       state.orderMode === "new" ||
       state.orderMode === "returning" ||
       Boolean(state.customer)
     );
+  }
+
+  function isAdminOwnerSignedIn() {
+    if (!isAdmin) return false;
+    if (!Auth || typeof Auth.isAdminAuthEnabled !== "function") return true;
+    if (!Auth.isAdminAuthEnabled()) return true;
+    return Boolean(Auth.getAdminSession());
+  }
+
+  function orderUiUnlocked() {
+    if (isAdmin) {
+      if (!state.customer) return false;
+      return !state.adminCustomerLocked;
+    }
+    if (state.isNewCustomer || state.orderMode === "new") return true;
+    if (state.orderMode === "returning" || state.customer) {
+      return !state.awaitingCustomerUnlock;
+    }
+    return false;
+  }
+
+  function evaluateCustomerUnlock(customer, opts) {
+    const options = opts || {};
+    state.unlockPhonePreverified = Boolean(options.phoneVerified);
+    if (!customer || !Auth || typeof Auth.customerNeedsUnlock !== "function") {
+      state.awaitingCustomerUnlock = false;
+      return;
+    }
+    // Phone lookup already proved phone; treat as unlocked for phone-only policy
+    if (options.phoneVerified && Auth.customerHasPin && !Auth.customerHasPin(customer)) {
+      const id = customer.qboCustomerId || customer.id;
+      if (id && Auth.unlockCustomer) {
+        Auth.unlockCustomer(id, { method: "phone-lookup" });
+      }
+      state.awaitingCustomerUnlock = false;
+      return;
+    }
+    state.awaitingCustomerUnlock = Auth.customerNeedsUnlock(customer);
+  }
+
+  function goHome(opts) {
+    if (isAdmin) {
+      window.location.href = "./index.html";
+      return;
+    }
+    const openReturning = Boolean(opts && opts.openReturning);
+    resetToLanding({ openReturning });
+    if (!openReturning) {
+      toast(t("toast.home"));
+    }
   }
 
   // ---------- render ----------
@@ -510,6 +725,7 @@
       "contactPhone",
       "contactEmail",
       "contactDeliveryDay",
+      "contactLanguage",
       "contactAddress",
       "startNewBtn",
       "startReturningBtn",
@@ -520,7 +736,27 @@
       "modeSwitchNew",
       "modeSwitchReturning",
       "switchToReturningBtn",
+      "switchToLandingFromNewBtn",
       "switchToLandingBtn",
+      "logoHomeBtn",
+      "customerUnlockSection",
+      "customerUnlockSub",
+      "customerUnlockPhoneField",
+      "customerUnlockPinField",
+      "customerUnlockPhone",
+      "customerUnlockPin",
+      "customerUnlockBtn",
+      "customerUnlockHint",
+      "adminGate",
+      "adminUsername",
+      "adminPassword",
+      "adminLoginBtn",
+      "adminGateHint",
+      "adminLogoutBtn",
+      "adminPhoneConfirm",
+      "adminCustomerPhone",
+      "adminUnlockCustomerBtn",
+      "adminPhoneHint",
     ].forEach((id) => {
       els[id] = document.getElementById(id);
     });
@@ -538,36 +774,86 @@
     if (state.submitted) {
       show(els.main, false);
       show(els.landing, false);
+      show(els.adminGate, false);
       show(els.successScreen, true);
       show(els.errorScreen, false);
       document.querySelector(".summary-bar")?.classList.add("hidden");
       return;
     }
 
+    // Admin owner gate
+    if (isAdmin && !isAdminOwnerSignedIn()) {
+      show(els.adminGate, true);
+      show(els.main, false);
+      show(els.landing, false);
+      show(els.adminLogoutBtn, false);
+      document.querySelector(".summary-bar")?.classList.add("hidden");
+      return;
+    }
+
+    if (isAdmin) {
+      show(els.adminGate, false);
+      show(els.adminLogoutBtn, Auth && Auth.isAdminAuthEnabled && Auth.isAdminAuthEnabled());
+    }
+
     if (!hasActiveSession()) {
       show(els.landing, true);
       show(els.main, false);
+      show(els.adminGate, false);
       document.querySelector(".summary-bar")?.classList.add("hidden");
       return;
     }
 
     show(els.landing, false);
     show(els.main, true);
-    document.querySelector(".summary-bar")?.classList.remove("hidden");
 
     const isNew = state.isNewCustomer || state.orderMode === "new";
+    const unlocked = orderUiUnlocked();
+    const needsCustomerUnlock =
+      !isAdmin && state.awaitingCustomerUnlock && Boolean(state.customer);
+    const showOrderChrome = unlocked && !needsCustomerUnlock;
+
+    show(els.customerUnlockSection, needsCustomerUnlock);
+    if (needsCustomerUnlock) {
+      const needsPin =
+        Auth && Auth.customerHasPin && Auth.customerHasPin(state.customer);
+      const pinOnly = needsPin && state.unlockPhonePreverified;
+      show(els.customerUnlockPhoneField, !pinOnly);
+      show(els.customerUnlockPinField, needsPin);
+      if (els.customerUnlockSub) {
+        els.customerUnlockSub.textContent = pinOnly
+          ? t("unlock.sub_pin_only")
+          : needsPin
+            ? t("unlock.sub_pin")
+            : t("unlock.sub_phone");
+      }
+    }
+
+    document
+      .querySelector(".summary-bar")
+      ?.classList.toggle("hidden", !showOrderChrome);
+
+    // Order body: cart / browse / notes / cutoff (marked data-order-body in HTML, or class)
+    document.querySelectorAll("[data-order-body]").forEach((el) => {
+      show(el, showOrderChrome);
+    });
+
     show(els.contactSection, isNew && !isAdmin);
     // Allow leaving accidental "new customer" path
     show(els.modeSwitchNew, isNew && !isAdmin);
-    // Returning (from phone lookup, not forced SMS deep-link with only id) can go home
+    // Returning (phone path or locked SMS link) can return home
     show(
       els.modeSwitchReturning,
-      !isAdmin && state.orderMode === "returning" && !params.get("customerId")
+      !isAdmin &&
+        state.orderMode === "returning" &&
+        (!params.get("customerId") || state.awaitingCustomerUnlock)
     );
-    // Decline entire delivery period: returning customers + admin (when a client is selected)
+
+    // Decline: unlocked returning / admin only
     const canDeclinePeriod =
       Boolean(state.customer) &&
       !isNew &&
+      showOrderChrome &&
       (state.orderMode === "returning" || state.orderMode === "admin" || isAdmin);
     show(els.declineSection, canDeclinePeriod);
     show(els.declineFooter, canDeclinePeriod);
@@ -575,53 +861,62 @@
     show(els.declineBtnTop, canDeclinePeriod);
     show(els.declineBtnBar, canDeclinePeriod);
 
+    if (isAdmin) {
+      show(
+        els.adminPhoneConfirm,
+        Boolean(state.customer) && state.adminCustomerLocked
+      );
+    }
+
     if (els.headerBadge) {
-      if (isAdmin) els.headerBadge.textContent = "Admin";
-      else if (isNew) els.headerBadge.textContent = "New customer";
-      else els.headerBadge.textContent = "Weekly order";
+      if (isAdmin) els.headerBadge.textContent = t("header.badge_admin");
+      else if (isNew) els.headerBadge.textContent = t("header.badge_new");
+      else els.headerBadge.textContent = t("header.badge_weekly");
     }
 
     if (els.heroKicker) {
       els.heroKicker.textContent = isNew
-        ? "Welcome"
+        ? t("hero.kicker_welcome")
         : isAdmin
-          ? "Ordering for"
-          : "Hello";
+          ? t("hero.kicker_ordering")
+          : t("hero.kicker_hello");
     }
 
     if (els.heroSubtitle) {
       els.heroSubtitle.textContent = isNew
-        ? "Build your order — Search or Browse products below."
-        : "What would you like this week?";
+        ? t("hero.subtitle_new")
+        : t("hero.subtitle");
     }
 
     if (els.cartHeading) {
       els.cartHeading.textContent = isNew
-        ? "Your Order"
-        : "Your Previous Order";
+        ? t("cart.heading")
+        : t("cart.heading_previous");
     }
     if (els.cartSub) {
       const hasStaffPicks = staffPickProducts().length > 0;
       els.cartSub.textContent = isNew
         ? hasStaffPicks
-          ? "Add items from Staff Picks or the catalog below."
-          : "Add items from the catalog below."
-        : "Adjust quantities or remove items. Your last order is pre-filled.";
+          ? t("cart.sub_new_picks")
+          : t("cart.sub_new")
+        : t("cart.sub_returning");
     }
 
     if (isNew) {
       writeContactFields();
       const displayName =
-        state.contact.name || state.customer?.name || "New customer";
+        state.contact.name || state.customer?.name || t("hero.new_customer");
       if (els.customerName) els.customerName.textContent = displayName;
       if (els.deliveryPill) {
-        const day = state.contact.deliveryDay || "TBD";
+        const day = state.contact.deliveryDay
+          ? weekdayLabel(state.contact.deliveryDay)
+          : t("hero.tbd");
         if (els.deliveryDate) els.deliveryDate.textContent = day;
       }
       if (els.cutoffNotice) {
         els.cutoffNotice.innerHTML = `
-          <p class="notice-primary"><strong>Orders must be submitted by <span class="notice-time">5:00 PM</span> the day before delivery</strong></p>
-          <p class="notice-secondary">New accounts are reviewed by DisFruta before the first delivery</p>
+          <p class="notice-primary"><strong>${t("notice.cutoff")}</strong></p>
+          <p class="notice-secondary">${t("notice.new_review")}</p>
         `;
       }
     } else if (state.customer) {
@@ -630,21 +925,21 @@
         const label =
           formatDate(state.customer.nextDeliveryDate) !== "—"
             ? formatDate(state.customer.nextDeliveryDate)
-            : state.customer.dayOfWeek || "—";
+            : weekdayLabel(state.customer.dayOfWeek) || "—";
         els.deliveryDate.textContent = label;
       }
       if (els.cutoffNotice) {
-        const deadline = state.customer.nextDeliveryDate
-          ? ` on ${dayBeforeLabel(
-              state.customer.nextDeliveryDate
-            )} (the day before delivery)`
-          : " the day before delivery";
+        const noticeHtml = state.customer.nextDeliveryDate
+          ? t("notice.cutoff_on", {
+              day: dayBeforeLabel(state.customer.nextDeliveryDate),
+            })
+          : t("notice.cutoff_before");
         els.cutoffNotice.innerHTML = `
-          <p class="notice-primary"><strong>Orders must be submitted by <span class="notice-time">5:00 PM</span>${deadline}</strong></p>
+          <p class="notice-primary"><strong>${noticeHtml}</strong></p>
         `;
       }
     } else if (isAdmin && els.customerName) {
-      els.customerName.textContent = "Select a customer";
+      els.customerName.textContent = t("hero.select_customer");
       if (els.deliveryDate) els.deliveryDate.textContent = "—";
     }
 
@@ -653,8 +948,9 @@
 
   function renderAdminSelect() {
     if (!els.adminSelect) return;
+    const prev = els.adminSelect.value;
     const options = [
-      `<option value="">— Choose customer —</option>`,
+      `<option value="">${escapeHtml(t("admin.select_placeholder"))}</option>`,
       ...state.customers
         .filter((c) => c.active !== false)
         .map(
@@ -665,6 +961,9 @@
         ),
     ];
     els.adminSelect.innerHTML = options.join("");
+    if (prev) els.adminSelect.value = prev;
+    if (els.adminSelect.dataset.bound === "1") return;
+    els.adminSelect.dataset.bound = "1";
     els.adminSelect.addEventListener("change", () => {
       const id = els.adminSelect.value;
       state.customer =
@@ -672,13 +971,33 @@
         null;
       state.orderMode = "admin";
       state.isNewCustomer = false;
-      if (state.customer) seedCartFromPrevious(state.customer);
-      else state.cart.clear();
-      renderShell();
-      renderCart();
-      renderPromo();
-      renderBrowse();
-      updateSummary();
+      state.cart.clear();
+      if (els.adminCustomerPhone) els.adminCustomerPhone.value = "";
+      if (els.adminPhoneHint) {
+        els.adminPhoneHint.textContent = "";
+        els.adminPhoneHint.className = "landing-hint";
+      }
+
+      if (!state.customer) {
+        state.adminCustomerLocked = false;
+      } else if (
+        Auth &&
+        Auth.requireAdminCustomerPhone &&
+        Auth.requireAdminCustomerPhone()
+      ) {
+        const already =
+          Auth.isCustomerUnlocked &&
+          Auth.isCustomerUnlocked(state.customer.qboCustomerId);
+        state.adminCustomerLocked = !already;
+        if (already) seedCartFromPrevious(state.customer);
+      } else {
+        state.adminCustomerLocked = false;
+        seedCartFromPrevious(state.customer);
+      }
+
+      applySessionLanguage({ silent: true, source: "admin" });
+      if (I18n && typeof I18n.applyDom === "function") I18n.applyDom();
+      enterOrderUI();
     });
   }
 
@@ -686,23 +1005,28 @@
     if (!els.cartList) return;
     const lines = cartLines();
     if (els.cartCount)
-      els.cartCount.textContent = `${lines.length} item${
-        lines.length === 1 ? "" : "s"
-      }`;
+      els.cartCount.textContent = tn(
+        lines.length,
+        "cart.items_one",
+        "cart.items_many",
+        { n: lines.length }
+      );
 
     if (!lines.length) {
       const isNew = state.isNewCustomer || state.orderMode === "new";
       const hasStaffPicks = staffPickProducts().length > 0;
       els.cartList.innerHTML = `
         <div class="empty">
-          <strong>${isNew ? "Your cart is empty" : "No items yet"}</strong>
-          ${
+          <strong>${escapeHtml(
+            isNew ? t("cart.empty_new") : t("cart.empty_returning")
+          )}</strong>
+          ${escapeHtml(
             isNew
               ? hasStaffPicks
-                ? "Browse products or tap a Staff Pick to start your order."
-                : "Browse products to start your order."
-              : "Your previous order will appear here when available. Add products below."
-          }
+                ? t("cart.empty_new_hint_picks")
+                : t("cart.empty_new_hint")
+              : t("cart.empty_returning_hint")
+          )}
         </div>`;
       return;
     }
@@ -726,16 +1050,22 @@
           </div>
           <div class="item-actions">
             <div class="line-subtotal">${money(line.lineTotal)}</div>
-            <div class="qty" role="group" aria-label="Quantity for ${escapeAttr(
-              line.name
+            <div class="qty" role="group" aria-label="${escapeAttr(
+              t("cart.qty_for", { name: line.name })
             )}">
-              <button type="button" data-action="dec" aria-label="Decrease">−</button>
+              <button type="button" data-action="dec" aria-label="${escapeAttr(
+                t("cart.decrease")
+              )}">−</button>
               <input type="number" inputmode="numeric" min="0" max="9999" value="${
                 line.quantity
-              }" aria-label="Quantity" />
-              <button type="button" data-action="inc" aria-label="Increase">+</button>
+              }" aria-label="${escapeAttr(t("cart.quantity"))}" />
+              <button type="button" data-action="inc" aria-label="${escapeAttr(
+                t("cart.increase")
+              )}">+</button>
             </div>
-            <button type="button" class="btn-remove" data-action="remove">Remove</button>
+            <button type="button" class="btn-remove" data-action="remove">${escapeHtml(
+              t("cart.remove")
+            )}</button>
           </div>
         </div>`;
       })
@@ -751,8 +1081,9 @@
   function renderPromo() {
     const picks = staffPickProducts();
     // Hide entire Staff Picks block when sheet has none marked staff_pick
+    // Also hide while customer/admin unlock is pending
     if (els.promoSection) {
-      show(els.promoSection, picks.length > 0);
+      show(els.promoSection, picks.length > 0 && orderUiUnlocked());
     }
     if (!els.promoGrid) return;
     if (!picks.length) {
@@ -761,15 +1092,23 @@
     }
 
     if (els.promoTitle) {
-      els.promoTitle.textContent = cfg.promoTitle || "Staff Picks";
+      // Prefer i18n; allow config override only when it is a custom non-default title
+      const customTitle =
+        cfg.promoTitle && cfg.promoTitle !== "Staff Picks" ? cfg.promoTitle : null;
+      els.promoTitle.textContent = customTitle || t("promo.title");
     }
+
+    const promoTag =
+      cfg.promoTag && cfg.promoTag !== "This week" && cfg.promoTag !== "Staff Pick"
+        ? cfg.promoTag
+        : t("promo.tag");
 
     els.promoGrid.innerHTML = picks
       .map((p) => {
         const inCart = state.cart.has(p.sku);
         return `
         <article class="promo-card" data-sku="${escapeAttr(p.sku)}">
-          <span class="tag">${escapeHtml(cfg.promoTag || "Staff Pick")}</span>
+          <span class="tag">${escapeHtml(promoTag)}</span>
           <h4>${escapeHtml(p.name)}</h4>
           <p>${escapeHtml(p.description || p.unit || "")}</p>
           <div class="promo-footer">
@@ -777,7 +1116,7 @@
           p.unit || "ea"
         )}</small></span>
             <button type="button" class="btn btn-add" data-action="promo-add">
-              ${inCart ? "Add more" : "Add"}
+              ${escapeHtml(inCart ? t("promo.add_more") : t("promo.add"))}
             </button>
           </div>
         </article>`;
@@ -860,12 +1199,9 @@
     return ["All", ...ordered];
   }
 
-  /** Shorter chip labels for long pulp category names */
+  /** Shorter chip labels for long pulp category names (localized) */
   function categoryChipLabel(category) {
-    if (!category || category === "All") return category || "All";
-    const m = category.match(/^Frozen Fruit Pulps\s+(.+)$/i);
-    if (m) return `Fruit Pulps ${m[1]}`;
-    return category;
+    return catChip(category || "All");
   }
 
   /** Fold accents and lowercase for resilient search (arepa, maíz, etc.) */
@@ -942,11 +1278,14 @@
     const count =
       c === "All" ? state.products.length : productsInCategory(c).length;
     const label = categoryChipLabel(c);
+    const fullLabel = catLabel(c);
     return `<button type="button" class="chip ${
       c === state.category ? "active" : ""
     }" data-category="${escapeAttr(c)}" title="${escapeAttr(
-      `${c} — ${count} products`
-    )}" aria-label="${escapeAttr(`${c}, ${count} products`)}">${escapeHtml(
+      t("browse.chip_title", { category: fullLabel, n: count })
+    )}" aria-label="${escapeAttr(
+      t("browse.chip_aria", { category: fullLabel, n: count })
+    )}">${escapeHtml(
       label
     )} <span class="chip-count">(${count})</span></button>`;
   }
@@ -1005,9 +1344,12 @@
       !searching && state.category !== "All" && list.length > 0;
     show(els.browseToolbar, showCategoryAll);
     if (els.browseToolbarLabel && showCategoryAll) {
-      els.browseToolbarLabel.textContent = `${list.length} product${
-        list.length === 1 ? "" : "s"
-      } in ${state.category}`;
+      els.browseToolbarLabel.textContent = tn(
+        list.length,
+        "browse.toolbar_one",
+        "browse.toolbar_many",
+        { n: list.length, category: catLabel(state.category) }
+      );
     }
   }
 
@@ -1027,13 +1369,23 @@
 
     if (els.browseCount) {
       if (searching) {
-        els.browseCount.textContent = `${list.length} match${
-          list.length === 1 ? "" : "es"
-        } (all products)`;
+        els.browseCount.textContent = tn(
+          list.length,
+          "browse.matches_one",
+          "browse.matches_many",
+          { n: list.length }
+        );
       } else if (state.category === "All") {
-        els.browseCount.textContent = `${list.length} products`;
+        els.browseCount.textContent = tn(
+          list.length,
+          "browse.products_one",
+          "browse.products_many",
+          { n: list.length }
+        );
       } else {
-        els.browseCount.textContent = `${list.length} in category`;
+        els.browseCount.textContent = t("browse.in_category", {
+          n: list.length,
+        });
       }
     }
 
@@ -1042,9 +1394,8 @@
     if (!state.products.length) {
       els.browseList.innerHTML = `
         <div class="empty">
-          <strong>No products loaded</strong>
-          Check that the Google Sheet is shared as “Anyone with the link → Viewer”,
-          then refresh. Fallback catalog may also be missing.
+          <strong>${escapeHtml(t("browse.empty_loaded"))}</strong>
+          ${escapeHtml(t("browse.empty_loaded_body"))}
         </div>`;
       return;
     }
@@ -1052,13 +1403,19 @@
     if (!list.length) {
       els.browseList.innerHTML = `
         <div class="empty">
-          <strong>No products match</strong>
+          <strong>${escapeHtml(t("browse.empty_match"))}</strong>
           ${
             searching
-              ? `Nothing matched “${escapeHtml(state.search.trim())}”. Try fewer words or another spelling.`
-              : `No active products in “${escapeHtml(state.category)}”.`
+              ? escapeHtml(
+                  t("browse.empty_search", { q: state.search.trim() })
+                )
+              : escapeHtml(
+                  t("browse.empty_category", {
+                    category: catLabel(state.category),
+                  })
+                )
           }
-          <p class="browse-empty-hint">Tip: choose <strong>All</strong> or clear the search box to browse everything.</p>
+          <p class="browse-empty-hint">${t("browse.empty_tip")}</p>
         </div>`;
       return;
     }
@@ -1066,7 +1423,7 @@
     els.browseList.innerHTML = list
       .map((p) => {
         const qty = state.cart.get(p.sku) || 0;
-        const name = p.name || p.sku || "Product";
+        const name = p.name || p.sku || t("browse.product_fallback");
         return `
         <div class="browse-row" data-sku="${escapeAttr(p.sku)}">
           <div>
@@ -1081,15 +1438,25 @@
               <span>·</span>
               <span>${escapeHtml(p.unit || "ea")}</span>
               <span>·</span>
-              <span>${escapeHtml(p.category || "")}</span>
+              <span>${escapeHtml(catLabel(p.category || ""))}</span>
               <span>·</span>
               <span>${escapeHtml(p.sku || "")}</span>
-              ${qty ? `<span>· In order: ${qty}</span>` : ""}
+              ${
+                qty
+                  ? `<span>· ${escapeHtml(
+                      t("browse.in_order", { n: qty })
+                    )}</span>`
+                  : ""
+              }
             </div>
           </div>
           <div class="browse-add">
-            <input type="number" min="1" max="9999" value="1" aria-label="Qty to add" />
-            <button type="button" class="btn btn-add" data-action="browse-add">Add</button>
+            <input type="number" min="1" max="9999" value="1" aria-label="${escapeAttr(
+              t("browse.qty_add")
+            )}" />
+            <button type="button" class="btn btn-add" data-action="browse-add">${escapeHtml(
+              t("browse.add")
+            )}</button>
           </div>
         </div>`;
       })
@@ -1099,7 +1466,7 @@
   function addAllInCategory(category) {
     const list = productsInCategory(category);
     if (!list.length) {
-      toast("No products in that category");
+      toast(t("toast.no_in_category"));
       return;
     }
     let added = 0;
@@ -1117,9 +1484,14 @@
     renderPromo();
     updateSummary();
     if (added === 0) {
-      toast("All products in this category are already on your order");
+      toast(t("toast.all_already"));
     } else {
-      toast(`Added ${added} item${added === 1 ? "" : "s"} from ${category}`);
+      toast(
+        tn(added, "toast.added_from_cat_one", "toast.added_from_cat_many", {
+          n: added,
+          category: catLabel(category),
+        })
+      );
     }
   }
 
@@ -1127,19 +1499,25 @@
     const lines = cartLines();
     const total = cartTotal();
     if (els.summaryCount)
-      els.summaryCount.textContent = `${lines.length} item${
-        lines.length === 1 ? "" : "s"
-      }`;
+      els.summaryCount.textContent = tn(
+        lines.length,
+        "cart.items_one",
+        "cart.items_many",
+        { n: lines.length }
+      );
     if (els.summaryTotal) els.summaryTotal.textContent = money(total);
     if (els.submitBtn) {
-      const sessionOk = hasActiveSession() && (state.customer || isAdmin);
+      const sessionOk =
+        hasActiveSession() &&
+        orderUiUnlocked() &&
+        (state.customer || (isAdmin && state.customer) || state.isNewCustomer);
       els.submitBtn.disabled =
         state.submitting || !sessionOk || lines.length === 0;
       els.submitBtn.textContent = state.submitting
-        ? "Submitting…"
+        ? t("summary.submitting")
         : state.isNewCustomer
-          ? "Submit first order"
-          : "Submit Order";
+          ? t("summary.submit_first")
+          : t("summary.submit");
     }
   }
 
@@ -1175,9 +1553,13 @@
   }
 
   function bindEvents() {
+    els.logoHomeBtn?.addEventListener("click", () => {
+      goHome({ openReturning: false });
+    });
+
     els.startNewBtn?.addEventListener("click", () => {
       if (cfg.allowNewCustomers === false) {
-        toast("New customer orders are not enabled");
+        toast(t("toast.new_disabled"));
         return;
       }
       startNewCustomer();
@@ -1187,7 +1569,7 @@
 
     els.startReturningBtn?.addEventListener("click", () => {
       if (cfg.allowPhoneLookup === false) {
-        toast("Use the personalized link from your text message");
+        toast(t("toast.use_sms_link"));
         return;
       }
       show(els.returningPanel, true);
@@ -1198,16 +1580,144 @@
       switchToReturningLookup();
     });
 
+    els.switchToLandingFromNewBtn?.addEventListener("click", () => {
+      goHome({ openReturning: false });
+    });
+
     els.switchToLandingBtn?.addEventListener("click", () => {
-      resetToLanding({ openReturning: false });
-      toast("Choose new or existing customer");
+      goHome({ openReturning: false });
+    });
+
+    // --- Admin owner login ---
+    const tryAdminLogin = () => {
+      if (!Auth || !Auth.loginAdmin) return;
+      const result = Auth.loginAdmin(
+        els.adminUsername?.value,
+        els.adminPassword?.value
+      );
+      if (!result.ok) {
+        if (els.adminGateHint) {
+          els.adminGateHint.textContent = t("admin.login_error");
+          els.adminGateHint.className = "landing-hint error";
+        }
+        return;
+      }
+      if (els.adminGateHint) {
+        els.adminGateHint.textContent = "";
+        els.adminGateHint.className = "landing-hint";
+      }
+      if (els.adminPassword) els.adminPassword.value = "";
+      enterOrderUI();
+      els.adminSelect?.focus();
+    };
+    els.adminLoginBtn?.addEventListener("click", tryAdminLogin);
+    els.adminPassword?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        tryAdminLogin();
+      }
+    });
+    els.adminUsername?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        els.adminPassword?.focus();
+      }
+    });
+    els.adminLogoutBtn?.addEventListener("click", () => {
+      if (Auth && Auth.logoutAdmin) Auth.logoutAdmin();
+      state.customer = null;
+      state.cart.clear();
+      state.adminCustomerLocked = false;
+      if (els.adminSelect) els.adminSelect.value = "";
+      enterOrderUI();
+      els.adminUsername?.focus();
+    });
+
+    const tryAdminUnlockCustomer = () => {
+      if (!state.customer || !Auth || !Auth.verifyAdminCustomerPhone) return;
+      const result = Auth.verifyAdminCustomerPhone(
+        state.customer,
+        els.adminCustomerPhone?.value
+      );
+      if (!result.ok) {
+        if (els.adminPhoneHint) {
+          els.adminPhoneHint.textContent =
+            result.error === "no_phone_on_file"
+              ? t("admin.phone_missing")
+              : t("admin.phone_error");
+          els.adminPhoneHint.className = "landing-hint error";
+        }
+        return;
+      }
+      state.adminCustomerLocked = false;
+      seedCartFromPrevious(state.customer);
+      if (els.adminPhoneHint) {
+        els.adminPhoneHint.textContent = t("admin.phone_ok");
+        els.adminPhoneHint.className = "landing-hint ok";
+      }
+      enterOrderUI();
+    };
+    els.adminUnlockCustomerBtn?.addEventListener("click", tryAdminUnlockCustomer);
+    els.adminCustomerPhone?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        tryAdminUnlockCustomer();
+      }
+    });
+
+    // --- Customer phone / PIN unlock ---
+    const tryCustomerUnlock = () => {
+      if (!state.customer || !Auth || !Auth.verifyCustomerAccess) return;
+      const phone = state.unlockPhonePreverified
+        ? state.customer.phone
+        : els.customerUnlockPhone?.value;
+      const result = Auth.verifyCustomerAccess(state.customer, {
+        phone,
+        pin: els.customerUnlockPin?.value,
+      });
+      if (!result.ok) {
+        if (els.customerUnlockHint) {
+          els.customerUnlockHint.textContent =
+            result.error === "pin"
+              ? t("unlock.error_pin")
+              : result.error === "phone"
+                ? t("unlock.error_phone")
+                : t("unlock.error_generic");
+          els.customerUnlockHint.className = "landing-hint error";
+        }
+        return;
+      }
+      state.awaitingCustomerUnlock = false;
+      seedCartFromPrevious(state.customer);
+      if (els.customerUnlockHint) {
+        els.customerUnlockHint.textContent = "";
+        els.customerUnlockHint.className = "landing-hint";
+      }
+      enterOrderUI();
+    };
+    els.customerUnlockBtn?.addEventListener("click", tryCustomerUnlock);
+    els.customerUnlockPin?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        tryCustomerUnlock();
+      }
+    });
+    els.customerUnlockPhone?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (els.customerUnlockPinField && !els.customerUnlockPinField.classList.contains("hidden")) {
+          els.customerUnlockPin?.focus();
+        } else {
+          tryCustomerUnlock();
+        }
+      }
     });
 
     els.lookupBtn?.addEventListener("click", () => {
       const phone = els.lookupPhone?.value || "";
       if (normalizePhone(phone).length < 7) {
         if (els.lookupHint) {
-          els.lookupHint.textContent = "Enter a valid phone number.";
+          els.lookupHint.textContent = t("toast.invalid_phone");
           els.lookupHint.className = "landing-hint error";
         }
         return;
@@ -1216,10 +1726,12 @@
       if (!match) {
         if (els.lookupHint) {
           els.lookupHint.innerHTML =
-            "No account found for that number. " +
+            escapeHtml(t("toast.no_account")) +
             (cfg.allowNewCustomers !== false
-              ? `<button type="button" class="btn-ghost" id="lookupToNew">Start as a new customer</button>`
-              : "Use the link from your SMS, or contact DisFruta.");
+              ? `<button type="button" class="btn-ghost" id="lookupToNew">${escapeHtml(
+                  t("toast.no_account_new")
+                )}</button>`
+              : escapeHtml(t("toast.no_account_sms")));
           els.lookupHint.className = "landing-hint error";
           document.getElementById("lookupToNew")?.addEventListener("click", () => {
             startNewCustomer();
@@ -1230,10 +1742,12 @@
         return;
       }
       if (els.lookupHint) {
-        els.lookupHint.textContent = `Welcome back, ${match.name}!`;
+        els.lookupHint.textContent = t("toast.welcome_back", {
+          name: match.name,
+        });
         els.lookupHint.className = "landing-hint ok";
       }
-      startReturningCustomer(match);
+      startReturningCustomer(match, { phoneVerified: true });
       enterOrderUI();
     });
 
@@ -1252,15 +1766,30 @@
           readContactFields();
           if (els.customerName) {
             els.customerName.textContent =
-              state.contact.name || "New customer";
+              state.contact.name || t("hero.new_customer");
           }
           if (els.deliveryDate && state.contact.deliveryDay) {
-            els.deliveryDate.textContent = state.contact.deliveryDay;
+            els.deliveryDate.textContent = weekdayLabel(
+              state.contact.deliveryDay
+            );
           }
           updateSummary();
         });
       }
     );
+
+    // New customers only: one-time preferred language → switches entire UI
+    els.contactLanguage?.addEventListener("change", () => {
+      if (!state.isNewCustomer) return;
+      readContactFields();
+      if (I18n) {
+        I18n.setLang(state.contact.language || "en", {
+          source: "new-user",
+          persist: false,
+          updateUrl: false,
+        });
+      }
+    });
 
     els.cartList?.addEventListener("click", (e) => {
       const row = closest(e, ".line-item");
@@ -1272,7 +1801,7 @@
       if (action === "dec") addQty(sku, -1);
       if (action === "remove") {
         setQty(sku, 0);
-        toast("Item removed");
+        toast(t("toast.item_removed"));
       }
     });
 
@@ -1290,7 +1819,7 @@
       const card = btn.closest("[data-sku]");
       if (!card) return;
       addQty(rowSku(card), 1);
-      toast("Added to order");
+      toast(t("toast.added"));
     });
 
     els.browseList?.addEventListener("click", (e) => {
@@ -1303,16 +1832,16 @@
       const qty = clampQty(input?.value || 1) || 1;
       const sku = rowSku(row);
       if (!sku) {
-        toast("Could not add item (missing SKU)");
+        toast(t("toast.missing_sku"));
         return;
       }
       if (!state.productsBySku.has(resolveSku(sku))) {
-        toast("Product not in catalog");
+        toast(t("toast.not_in_catalog"));
         console.warn("Unknown SKU", sku, "catalog size", state.products.length);
         return;
       }
       addQty(sku, qty);
-      toast("Added to order");
+      toast(t("toast.added"));
     });
 
     els.categoryTabs?.addEventListener("click", (e) => {
@@ -1344,7 +1873,10 @@
       if (
         n > 15 &&
         !confirm(
-          `Add all ${n} products in “${state.category}” to your order (qty 1 each)?`
+          t("confirm.add_all", {
+            n,
+            category: catLabel(state.category),
+          })
         )
       ) {
         return;
@@ -1360,23 +1892,24 @@
 
     const onDeclinePeriod = () => {
       if (!state.customer) {
-        toast(isAdmin ? "Select a customer first" : "Open your order link first");
+        toast(
+          isAdmin ? t("toast.select_customer") : t("toast.open_link_first")
+        );
         return;
       }
       const period =
         state.customer.nextDeliveryDate ||
         state.customer.dayOfWeek ||
-        "this delivery period";
+        t("decline.period_fallback");
       const periodLabel =
         state.customer.nextDeliveryDate
           ? formatDate(state.customer.nextDeliveryDate)
           : period;
       const ok = confirm(
-        `Skip the entire order period for ${state.customer.name}?\n\n` +
-          `Delivery: ${periodLabel}\n\n` +
-          `• No invoice will be created\n` +
-          `• Reminders stop for this period\n` +
-          `• You can still order again next cycle`
+        t("decline.confirm", {
+          name: state.customer.name,
+          period: periodLabel,
+        })
       );
       if (ok) submitOrder(true);
     };
@@ -1384,6 +1917,16 @@
     els.declineBtn?.addEventListener("click", onDeclinePeriod);
     els.declineBtnTop?.addEventListener("click", onDeclinePeriod);
     els.declineBtnBar?.addEventListener("click", onDeclinePeriod);
+
+    // Re-apply UI copy when EN/ES is toggled
+    window.addEventListener("disfruta:lang", () => {
+      if (I18n && typeof I18n.applyDom === "function") I18n.applyDom();
+      if (!state.loading && !state.submitted) {
+        enterOrderUI();
+      } else if (state.submitted) {
+        renderShell();
+      }
+    });
   }
 
   // ---------- submit → Make.com (hub) → QBO / Sheets / Twilio ----------
@@ -1428,6 +1971,14 @@
         address: isNew
           ? state.contact.address
           : state.customer?.address || "",
+        preferredLanguage: isNew
+          ? normalizeLang(state.contact.language) || "en"
+          : normalizeLang(
+              state.customer?.preferredLanguage || state.customer?.language
+            ) ||
+            (I18n && typeof I18n.getLang === "function"
+              ? I18n.getLang()
+              : "en"),
         isNew,
       },
       delivery: {
@@ -1474,9 +2025,18 @@
               BillAddr: state.contact.address
                 ? { Line1: state.contact.address }
                 : undefined,
-              Notes: state.contact.deliveryDay
-                ? `Preferred delivery day: ${state.contact.deliveryDay}`
-                : undefined,
+              Notes: [
+                state.contact.deliveryDay
+                  ? `Preferred delivery day: ${state.contact.deliveryDay}`
+                  : "",
+                state.contact.language
+                  ? `Preferred language: ${
+                      normalizeLang(state.contact.language) || "en"
+                    }`
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" · ") || undefined,
             }
           : null,
         TxnDate: state.customer?.nextDeliveryDate || now.slice(0, 10),
@@ -1507,6 +2067,8 @@
         url: window.location.href,
         token: params.get("token") || "",
         orderMode: state.orderMode,
+        lang: I18n && typeof I18n.getLang === "function" ? I18n.getLang() : "en",
+        locale: activeLocale(),
       },
     };
   }
@@ -1539,30 +2101,42 @@
   }
 
   async function submitOrder(declined) {
+    if (isAdmin && !isAdminOwnerSignedIn()) {
+      toast(t("admin.login_error"));
+      return;
+    }
     if (isAdmin && !state.customer) {
-      toast("Select a customer first");
+      toast(t("toast.select_customer"));
+      return;
+    }
+    if (isAdmin && state.adminCustomerLocked) {
+      toast(t("admin.customer_phone_help"));
+      return;
+    }
+    if (!isAdmin && state.awaitingCustomerUnlock) {
+      toast(t("unlock.heading"));
       return;
     }
     if (!isAdmin && state.orderMode === "none") {
-      toast("Choose new or returning customer first");
+      toast(t("toast.choose_first"));
       return;
     }
     if (state.isNewCustomer && !declined && !validateNewCustomerContact()) {
-      toast("Enter your business name and phone number");
+      toast(t("toast.need_contact"));
       els.contactSection?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
     if (!state.isNewCustomer && !state.customer) {
-      toast("Open your personalized link or look up your account");
+      toast(t("toast.open_or_lookup"));
       return;
     }
     if (!declined && cartLines().length === 0) {
-      toast("Add at least one item — or skip this period if you need no delivery");
+      toast(t("toast.need_items"));
       return;
     }
     // Decline is allowed with an empty cart
     if (declined && !state.customer && !isAdmin) {
-      toast("Open your personalized link to skip this period");
+      toast(t("toast.open_to_skip"));
       return;
     }
     if (state.submitting) return;
@@ -1603,11 +2177,11 @@
       state.submitting = false;
       renderShell();
       if (els.successScreen) {
-        const name = escapeHtml(
+        const nameRaw =
           state.isNewCustomer
             ? state.contact.name
-            : state.customer?.name || "there"
-        );
+            : state.customer?.name || t("success.name_fallback");
+        const name = escapeHtml(nameRaw);
         let detail;
         const inv =
           submitResult?.invoice ||
@@ -1617,28 +2191,24 @@
           const when =
             state.customer?.nextDeliveryDate
               ? formatDate(state.customer.nextDeliveryDate)
-              : "this period";
-          detail = `No order for <strong>${escapeHtml(
-            when
-          )}</strong>. We won’t send more reminders for this delivery window, and no invoice will be created. See you next cycle!`;
-        } else if (inv && (inv.docNumber || inv.id)) {
-          detail = `Thanks, ${name}! Your order totaling ${money(
-            payload.order.subtotal
-          )} was received${
-            inv.docNumber
-              ? ` — QuickBooks invoice <strong>#${escapeHtml(
-                  String(inv.docNumber)
-                )}</strong>`
-              : ""
-          }. You'll get a confirmation shortly.`;
+              : t("success.when_period");
+          detail = t("success.declined", { when: escapeHtml(when) });
+        } else if (inv && inv.docNumber) {
+          detail = t("success.with_invoice", {
+            name,
+            total: money(payload.order.subtotal),
+            doc: escapeHtml(String(inv.docNumber)),
+          });
         } else if (state.isNewCustomer) {
-          detail = `Thanks, ${name}! Your first order totaling ${money(
-            payload.order.subtotal
-          )} was received. Our team will confirm your account and delivery details shortly.`;
+          detail = t("success.first_order", {
+            name,
+            total: money(payload.order.subtotal),
+          });
         } else {
-          detail = `Thanks, ${name}! Your order totaling ${money(
-            payload.order.subtotal
-          )} was received. You'll get a confirmation text shortly.`;
+          detail = t("success.with_total", {
+            name,
+            total: money(payload.order.subtotal),
+          });
         }
         els.successScreen.querySelector("[data-success-detail]").innerHTML =
           detail;
@@ -1651,7 +2221,7 @@
       show(els.main, false);
       document.querySelector(".summary-bar")?.classList.add("hidden");
       const msg = els.errorScreen?.querySelector("[data-error-detail]");
-      if (msg) msg.textContent = err.message || "Something went wrong.";
+      if (msg) msg.textContent = err.message || t("error.generic");
     }
   }
 
@@ -1692,6 +2262,9 @@
       if (cfg.allowNewCustomers === false) show(els.startNewBtn, false);
       // Bind once before first paint so early clicks work
       bindEvents();
+      // Apply preferred language once customer/session is known, then paint
+      applySessionLanguage({ silent: true, force: true });
+      if (I18n && typeof I18n.applyDom === "function") I18n.applyDom();
       renderShell();
       renderCart();
       renderPromo();
@@ -1707,7 +2280,7 @@
         state.dataSources
       );
       if (!state.products.length) {
-        toast("No products loaded — check console");
+        toast(t("toast.no_products"));
       }
     } catch (err) {
       console.error(err);
@@ -1717,8 +2290,7 @@
       const msg = els.errorScreen?.querySelector("[data-error-detail]");
       if (msg) {
         msg.textContent =
-          (err && err.message) ||
-          "Could not load order form. Serve via HTTP (python3 -m http.server) so products.json can load.";
+          (err && err.message) || t("error.load_failed");
       }
     }
   }

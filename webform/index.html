@@ -22,22 +22,40 @@
     <header class="site-header">
       <div class="site-header-inner">
         <h1 class="sr-only">DisFruta</h1>
-        <img
-          class="logo"
-          src="./assets/logo-header.png"
-          alt="DisFruta — Enjoy Freshness Delivered"
-          width="160"
-          height="98"
-        />
+        <button
+          type="button"
+          class="logo-home"
+          id="logoHomeBtn"
+          data-i18n-aria-label="header.logo_home"
+          aria-label="DisFruta home — back to start"
+          title="Back to start"
+        >
+          <img
+            class="logo"
+            src="./assets/logo-header.png"
+            alt="DisFruta — Enjoy Freshness Delivered"
+            width="160"
+            height="98"
+          />
+        </button>
         <span class="header-spacer" aria-hidden="true"></span>
-        <span class="badge" id="headerBadge">Weekly order</span>
+        <!--
+          Language toggle (disabled): returning customers get preferred language
+          from the Clients sheet / SMS ?lang=. New customers pick language once
+          on the contact form. Uncomment if manual override is needed later.
+        <div class="lang-switch" role="group" data-i18n-aria-label="header.lang_label" aria-label="Language">
+          <button type="button" class="lang-btn" data-set-lang="en" aria-pressed="true">EN</button>
+          <button type="button" class="lang-btn" data-set-lang="es" aria-pressed="false">ES</button>
+        </div>
+        -->
+        <span class="badge" id="headerBadge" data-i18n="header.badge_weekly">Weekly order</span>
       </div>
     </header>
 
     <div id="loadingScreen" class="state-screen">
       <div class="spinner" aria-hidden="true"></div>
-      <h2>Loading your order…</h2>
-      <p>Loading products and customer options.</p>
+      <h2 data-i18n="loading.title">Loading your order…</h2>
+      <p data-i18n="loading.body">Loading products and customer options.</p>
     </div>
 
     <!-- Public entry: new customers OR returning (link / lookup) -->
@@ -49,73 +67,74 @@
         width="240"
         height="148"
       />
-      <h1>Order with DisFruta</h1>
-      <p>
+      <h1 data-i18n="landing.title">Order with DisFruta</h1>
+      <p data-i18n="landing.body">
         Place a new wholesale order, or reopen your usual order with a
         personalized link or phone lookup.
       </p>
 
       <div class="landing-actions">
-        <button type="button" class="btn btn-primary btn-block" id="startNewBtn">
+        <button type="button" class="btn btn-primary btn-block" id="startNewBtn" data-i18n="landing.new_btn">
           I’m a new customer
         </button>
-        <button type="button" class="btn btn-secondary btn-block" id="startReturningBtn">
+        <button type="button" class="btn btn-secondary btn-block" id="startReturningBtn" data-i18n="landing.returning_btn">
           I already order with DisFruta
         </button>
       </div>
-      <p class="landing-panel-sub" style="margin-top: 12px">
+      <p class="landing-panel-sub" style="margin-top: 12px" data-i18n="landing.switch_hint">
         You can switch later if you pick the wrong option.
       </p>
 
       <div id="returningPanel" class="landing-panel hidden">
-        <h2 class="landing-panel-title">Find your account</h2>
-        <p class="landing-panel-sub">
+        <h2 class="landing-panel-title" data-i18n="landing.find_title">Find your account</h2>
+        <p class="landing-panel-sub" data-i18n="landing.find_body">
           Use the link from your text message, or look up with the phone number
           on file.
         </p>
-        <label class="field-label" for="lookupPhone">Phone number</label>
+        <label class="field-label" for="lookupPhone" data-i18n="landing.phone_label">Phone number</label>
         <input
           id="lookupPhone"
           type="tel"
           inputmode="tel"
           autocomplete="tel"
           placeholder="(555) 123-4567"
+          data-i18n-placeholder="landing.phone_placeholder"
         />
-        <button type="button" class="btn btn-primary btn-block" id="lookupBtn">
+        <button type="button" class="btn btn-primary btn-block" id="lookupBtn" data-i18n="landing.lookup_btn">
           Find my previous order
         </button>
         <p class="landing-hint" id="lookupHint"></p>
-        <p class="landing-panel-sub" style="margin-top: 12px">
+        <p class="landing-panel-sub" style="margin-top: 12px" data-i18n="landing.sms_hint">
           Prefer SMS? Open the personalized link we sent you — it loads your
           account automatically.
         </p>
       </div>
 
       <p class="header-meta" style="margin-top: 24px">
-        <a href="./admin.html">Admin order entry</a>
+        <a href="./admin.html" data-i18n="landing.admin_link">Admin order entry</a>
       </p>
     </div>
 
     <div id="errorScreen" class="state-screen error hidden">
       <div class="icon" aria-hidden="true">!</div>
-      <h2>We couldn’t submit that</h2>
-      <p data-error-detail>
+      <h2 data-i18n="error.title">We couldn’t submit that</h2>
+      <p data-error-detail data-i18n="error.body">
         Something went wrong. Please try again.
       </p>
-      <p class="header-meta" style="margin-top: 8px">
+      <p class="header-meta" style="margin-top: 8px" data-i18n="error.tip">
         Tip: open the form via a local server, e.g.
         <code>cd webform && python3 -m http.server 8080</code>
         — not as a raw file:// page.
       </p>
-      <button type="button" class="btn btn-primary" onclick="DisfrutaOrder.retry()">
+      <button type="button" class="btn btn-primary" onclick="DisfrutaOrder.retry()" data-i18n="error.retry">
         Try again
       </button>
     </div>
 
     <div id="successScreen" class="state-screen success hidden">
       <div class="icon" aria-hidden="true">✓</div>
-      <h2>Order received</h2>
-      <p data-success-detail>
+      <h2 data-i18n="success.title">Order received</h2>
+      <p data-success-detail data-i18n="success.body">
         Thank you! Your order is in. You’ll get a confirmation text shortly.
       </p>
       <img
@@ -129,25 +148,78 @@
 
     <main id="main" class="app hidden">
       <section class="hero" aria-labelledby="heroTitle">
-        <p class="hero-kicker" id="heroKicker">Hello</p>
+        <p class="hero-kicker" id="heroKicker" data-i18n="hero.kicker_hello">Hello</p>
         <h2 id="heroTitle">
-          <span id="customerName">Customer</span>
+          <span id="customerName" data-i18n="hero.customer_fallback">Customer</span>
         </h2>
-        <p id="heroSubtitle">What would you like this week?</p>
+        <p id="heroSubtitle" data-i18n="hero.subtitle">What would you like this week?</p>
         <div class="delivery-pill" id="deliveryPill">
-          Next delivery:
+          <span data-i18n="hero.delivery_prefix">Next delivery:</span>
           <span id="deliveryDate">—</span>
         </div>
         <p class="mode-switch hidden" id="modeSwitchNew">
-          <button type="button" class="btn-link" id="switchToReturningBtn">
-            ← Already a customer? Find your account
+          <button type="button" class="btn-link" id="switchToLandingFromNewBtn" data-i18n="hero.switch_landing">
+            ← Back to start
+          </button>
+          <span class="mode-switch-sep" aria-hidden="true">·</span>
+          <button type="button" class="btn-link" id="switchToReturningBtn" data-i18n="hero.switch_returning">
+            Already a customer? Find your account
           </button>
         </p>
         <p class="mode-switch hidden" id="modeSwitchReturning">
-          <button type="button" class="btn-link" id="switchToLandingBtn">
+          <button type="button" class="btn-link" id="switchToLandingBtn" data-i18n="hero.switch_landing">
             ← Back to start
           </button>
         </p>
+      </section>
+
+      <!-- Returning customer unlock (phone / PIN) -->
+      <section
+        class="section auth-section hidden"
+        id="customerUnlockSection"
+        aria-labelledby="customerUnlockHeading"
+      >
+        <div class="section-head">
+          <h3 id="customerUnlockHeading" data-i18n="unlock.heading">Confirm it’s you</h3>
+        </div>
+        <p class="section-sub" id="customerUnlockSub" data-i18n="unlock.sub_phone">
+          Enter the phone number on your DisFruta account to open this order.
+        </p>
+        <div class="card contact-card">
+          <div class="field-grid">
+            <div class="field field-full" id="customerUnlockPhoneField">
+              <label class="field-label" for="customerUnlockPhone" data-i18n="unlock.phone_label"
+                >Phone on file</label
+              >
+              <input
+                id="customerUnlockPhone"
+                type="tel"
+                inputmode="tel"
+                autocomplete="tel"
+                placeholder="(555) 123-4567"
+                data-i18n-placeholder="landing.phone_placeholder"
+              />
+            </div>
+            <div class="field field-full hidden" id="customerUnlockPinField">
+              <label class="field-label" for="customerUnlockPin" data-i18n="unlock.pin_label"
+                >Order PIN</label
+              >
+              <input
+                id="customerUnlockPin"
+                type="password"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength="32"
+                placeholder="••••"
+                data-i18n-placeholder="unlock.pin_ph"
+              />
+            </div>
+          </div>
+          <p class="landing-hint" id="customerUnlockHint"></p>
+          <button type="button" class="btn btn-primary btn-block" id="customerUnlockBtn" data-i18n="unlock.submit">
+            Unlock my order
+          </button>
+        </div>
       </section>
 
       <!-- New customer contact details -->
@@ -157,9 +229,9 @@
         aria-labelledby="contactHeading"
       >
         <div class="section-head">
-          <h3 id="contactHeading">Your business details</h3>
+          <h3 id="contactHeading" data-i18n="contact.heading">Your business details</h3>
         </div>
-        <p class="section-sub">
+        <p class="section-sub" data-i18n-html="contact.sub">
           We’ll use this to set up your account and confirm the order.<br />
           If you already order with DisFruta, use the link above to look up
           your account instead.<br /><br />
@@ -168,7 +240,7 @@
         <div class="card contact-card">
           <div class="field-grid">
             <div class="field field-full">
-              <label class="field-label" for="contactName"
+              <label class="field-label" for="contactName" data-i18n="contact.name"
                 >Business / customer name *</label
               >
               <input
@@ -176,45 +248,57 @@
                 type="text"
                 autocomplete="organization"
                 placeholder="e.g. Mercado Latino Fresh"
+                data-i18n-placeholder="contact.name_ph"
                 required
               />
             </div>
             <div class="field">
-              <label class="field-label" for="contactPhone">Phone *</label>
+              <label class="field-label" for="contactPhone" data-i18n="contact.phone">Phone *</label>
               <input
                 id="contactPhone"
                 type="tel"
                 inputmode="tel"
                 autocomplete="tel"
                 placeholder="(555) 123-4567"
+                data-i18n-placeholder="landing.phone_placeholder"
                 required
               />
             </div>
             <div class="field">
-              <label class="field-label" for="contactEmail">Email</label>
+              <label class="field-label" for="contactEmail" data-i18n="contact.email">Email</label>
               <input
                 id="contactEmail"
                 type="email"
                 autocomplete="email"
                 placeholder="orders@business.com"
+                data-i18n-placeholder="contact.email_ph"
               />
             </div>
             <div class="field">
-              <label class="field-label" for="contactDeliveryDay"
+              <label class="field-label" for="contactDeliveryDay" data-i18n="contact.day"
                 >Preferred delivery day</label
               >
               <select id="contactDeliveryDay">
-                <option value="">— Select —</option>
-                <option>Monday</option>
-                <option>Tuesday</option>
-                <option>Wednesday</option>
-                <option>Thursday</option>
-                <option>Friday</option>
-                <option>Saturday</option>
+                <option value="" data-i18n-value="contact.day_select">— Select —</option>
+                <option value="Monday" data-i18n-value="contact.day_mon">Monday</option>
+                <option value="Tuesday" data-i18n-value="contact.day_tue">Tuesday</option>
+                <option value="Wednesday" data-i18n-value="contact.day_wed">Wednesday</option>
+                <option value="Thursday" data-i18n-value="contact.day_thu">Thursday</option>
+                <option value="Friday" data-i18n-value="contact.day_fri">Friday</option>
+                <option value="Saturday" data-i18n-value="contact.day_sat">Saturday</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label" for="contactLanguage" data-i18n="contact.language"
+                >Preferred language</label
+              >
+              <select id="contactLanguage" autocomplete="language">
+                <option value="en" data-i18n-value="contact.lang_en">English</option>
+                <option value="es" data-i18n-value="contact.lang_es">Español</option>
               </select>
             </div>
             <div class="field field-full">
-              <label class="field-label" for="contactAddress"
+              <label class="field-label" for="contactAddress" data-i18n="contact.address"
                 >Delivery address</label
               >
               <input
@@ -222,15 +306,16 @@
                 type="text"
                 autocomplete="street-address"
                 placeholder="Street, city, state, ZIP"
+                data-i18n-placeholder="contact.address_ph"
               />
             </div>
           </div>
         </div>
       </section>
 
-      <div class="notice" id="cutoffNotice" role="note">
+      <div class="notice" id="cutoffNotice" role="note" data-order-body>
         <p class="notice-primary">
-          <strong
+          <strong data-i18n-html="notice.cutoff"
             >Orders must be submitted by
             <span class="notice-time">5:00 PM</span> the day before
             delivery</strong
@@ -243,28 +328,29 @@
         class="section decline-section hidden"
         id="declineSection"
         aria-labelledby="declineHeading"
+        data-order-body
       >
         <div class="decline-card">
           <div class="decline-copy">
-            <h3 id="declineHeading">Don’t need a delivery this period?</h3>
-            <p>
+            <h3 id="declineHeading" data-i18n="decline.heading">Don’t need a delivery this period?</h3>
+            <p data-i18n="decline.body">
               Skip this cycle entirely — no invoice, and we stop reminders until
               your next delivery window.
             </p>
           </div>
-          <button type="button" class="btn btn-decline" id="declineBtnTop">
+          <button type="button" class="btn btn-decline" id="declineBtnTop" data-i18n="decline.btn">
             No order this period
           </button>
         </div>
       </section>
 
       <!-- 1. Cart (previous order for returning, empty for new) -->
-      <section class="section" aria-labelledby="cartHeading">
+      <section class="section" aria-labelledby="cartHeading" data-order-body>
         <div class="section-head">
-          <h3 id="cartHeading">Your Order</h3>
+          <h3 id="cartHeading" data-i18n="cart.heading">Your Order</h3>
           <span class="count" id="cartCount">0 items</span>
         </div>
-        <p class="section-sub" id="cartSub">
+        <p class="section-sub" id="cartSub" data-i18n="cart.sub_new">
           Add products below. Returning customers see last order pre-filled.
         </p>
         <div class="card" id="cartList"></div>
@@ -275,44 +361,46 @@
         class="section hidden"
         id="promoSection"
         aria-labelledby="promoTitle"
+        data-order-body
       >
         <div class="section-head">
-          <h3 id="promoTitle">Staff Picks</h3>
+          <h3 id="promoTitle" data-i18n="promo.title">Staff Picks</h3>
         </div>
-        <p class="section-sub">One-tap adds for this week’s recommended items.</p>
+        <p class="section-sub" data-i18n="promo.sub">One-tap adds for this week’s recommended items.</p>
         <div class="promo-grid" id="promoGrid"></div>
       </section>
 
       <!-- 3. Add more items -->
-      <section class="section" aria-labelledby="browseHeading">
+      <section class="section" aria-labelledby="browseHeading" data-order-body>
         <div class="section-head">
-          <h3 id="browseHeading">Add More Items</h3>
+          <h3 id="browseHeading" data-i18n="browse.heading">Add More Items</h3>
           <span class="count" id="browseCount">0 products</span>
         </div>
-        <p class="section-sub" id="browseSub">
+        <p class="section-sub" id="browseSub" data-i18n-html="browse.sub">
           Search the <strong>full catalog</strong> anytime (all categories), or
           pick a category chip to browse that group. Use
           <strong>Add all</strong> to put every item in a category on your order.
         </p>
         <div class="search-wrap">
-          <label class="sr-only" for="searchInput">Search all products</label>
+          <label class="sr-only" for="searchInput" data-i18n="browse.search_label">Search all products</label>
           <input
             id="searchInput"
             type="search"
             placeholder="Search all products by name, SKU…"
+            data-i18n-placeholder="browse.search_ph"
             autocomplete="off"
             enterkeyhint="search"
             spellcheck="false"
           />
         </div>
-        <p class="search-scope-hint hidden" id="searchScopeHint" role="status">
+        <p class="search-scope-hint hidden" id="searchScopeHint" role="status" data-i18n-html="browse.scope_hint">
           Searching <strong>all products</strong> — category filter is paused
           while you type.
         </p>
         <div class="category-tabs" id="categoryTabs" role="tablist"></div>
         <div class="browse-toolbar hidden" id="browseToolbar">
           <span id="browseToolbarLabel"></span>
-          <button type="button" class="btn btn-add" id="addCategoryAllBtn">
+          <button type="button" class="btn btn-add" id="addCategoryAllBtn" data-i18n="browse.add_all">
             Add all in category
           </button>
         </div>
@@ -320,34 +408,35 @@
       </section>
 
       <!-- Notes -->
-      <section class="section notes" aria-labelledby="notesHeading">
+      <section class="section notes" aria-labelledby="notesHeading" data-order-body>
         <div class="section-head">
-          <h3 id="notesHeading">Special notes</h3>
+          <h3 id="notesHeading" data-i18n="notes.heading">Special notes</h3>
         </div>
-        <p class="section-sub">
+        <p class="section-sub" data-i18n="notes.sub">
           Delivery instructions, substitutions, samples, or anything else we
           should know.
         </p>
-        <label class="sr-only" for="notesInput">Order notes</label>
+        <label class="sr-only" for="notesInput" data-i18n="notes.label">Order notes</label>
         <textarea
           id="notesInput"
           placeholder="e.g. Leave at back door · Need sample of arepas"
+          data-i18n-placeholder="notes.ph"
           maxlength="1000"
         ></textarea>
       </section>
 
       <div class="secondary-actions hidden" id="declineFooter">
-        <button type="button" class="btn btn-ghost" id="declineBtn">
+        <button type="button" class="btn btn-ghost" id="declineBtn" data-i18n="decline.btn_footer">
           No order needed this period
         </button>
       </div>
     </main>
 
     <!-- 4. Sticky order summary -->
-    <div class="summary-bar" role="region" aria-label="Order summary">
+    <div class="summary-bar" role="region" data-i18n-aria-label="summary.label" aria-label="Order summary">
       <div class="summary-inner summary-inner-split">
         <div>
-          <p class="summary-total-label">Total</p>
+          <p class="summary-total-label" data-i18n="summary.total">Total</p>
           <p class="summary-total" id="summaryTotal">$0.00</p>
           <p class="summary-meta" id="summaryCount">0 items</p>
         </div>
@@ -356,10 +445,11 @@
             type="button"
             class="btn btn-secondary summary-decline hidden"
             id="declineBtnBar"
+            data-i18n="decline.btn_bar"
           >
             Skip period
           </button>
-          <button type="button" class="btn btn-primary" id="submitBtn" disabled>
+          <button type="button" class="btn btn-primary" id="submitBtn" disabled data-i18n="summary.submit">
             Submit Order
           </button>
         </div>
@@ -367,6 +457,8 @@
     </div>
 
     <script src="./js/config.js"></script>
+    <script src="./js/i18n.js"></script>
+    <script src="./js/auth.js"></script>
     <!-- Embedded data: works without fetch (file:// and any static host) -->
     <script src="./js/products-data.js"></script>
     <script src="./js/customers-data.js"></script>
