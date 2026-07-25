@@ -19,6 +19,7 @@ Known constraints of the current system and implementation.
 - **Staff Picks**: Section hidden until products have `staff_pick = Yes`.  
 - **Make scenarios not in-repo**: Docs describe scenarios; actual Make blueprints must be configured in the Make UI and kept in sync with payload `version`.  
 - **Secrets**: Never put QBO client secrets in the webform; only in Make (or `server/.env` if using the helper API).  
+- **Admin / customer passwords in the browser**: `webform` auth is client-side (sessionStorage + config). It blocks casual access only. Production should add host-level protection on `admin.html` and consider a real server session or magic-link for customer accounts.  
 
 ## Timing docs inconsistency (historical)
 
@@ -31,3 +32,5 @@ Older notes mixed “2 days” vs “3 days” before delivery and different rem
 - Payment collection  
 - Inventory-aware ordering  
 - Customer-specific price rules in the form  
+- Stronger customer auth (server-side PIN/hash, OTP SMS, short-lived signed SMS links)  
+- Admin SSO / Cloudflare Access instead of config passwords  

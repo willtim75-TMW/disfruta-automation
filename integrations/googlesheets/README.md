@@ -86,6 +86,7 @@ BB-14,Blackberry-14,14oz bag,Produce & Fruit,3.70,ea,Yes,No,19,
 | Day of Week | No | Delivery day |
 | Next Delivery Date | No | `YYYY-MM-DD` (Make can also pass via URL) |
 | Last Order Date | No | |
+| Preferred Language | Recommended | `en` or `es` — form UI for this customer; also add `&lang=` on SMS links |
 | Active | No | Blank = active |
 | Notes | No | |
 
