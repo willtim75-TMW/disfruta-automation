@@ -63,10 +63,16 @@ Template: not required (sheet already exists). See Products section in googleshe
 | frequency | No | Weekly, etc. |
 | next_delivery_date | No | `YYYY-MM-DD` |
 | last_order_date | No | |
+| preferred_language | Recommended | `en` or `es` — form UI language for this customer. Also pass as SMS `?lang=` |
+| pin / access_pin | Optional | Customer order PIN. When set, form requires PIN (and phone) before cart unlocks |
 | active | No | |
 | notes | No | |
 
 Template: [`Clients.csv`](../integrations/googlesheets/templates/Clients.csv)
+
+**Language:** Returning customers see only their preferred language (no toggle). New customers choose once on the form; Make should write that value back to `preferred_language` when creating the Clients row.
+
+**Access:** Admin page uses owner username/password (`webform/js/config.js` → `auth.admin`) plus customer phone confirmation. Customer PIN is optional per account. Browser checks deter casual misuse only — put `admin.html` behind host auth in production.
 
 ---
 
