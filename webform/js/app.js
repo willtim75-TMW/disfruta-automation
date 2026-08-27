@@ -52,9 +52,24 @@
     return "";
   }
 
+  /** Preferred / primary language on a Clients-backed customer record. */
+  function customerLang(customer) {
+    if (I18n && typeof I18n.langFromCustomer === "function") {
+      return I18n.langFromCustomer(customer);
+    }
+    return normalizeLang(
+      customer &&
+        (customer.preferredLanguage ||
+          customer.primaryLanguage ||
+          customer.language ||
+          customer.lang ||
+          "")
+    );
+  }
+
   /**
    * Serve only the preferred language for the current session.
-   * Returning / admin: customer.preferredLanguage (or SMS ?lang=).
+   * Returning / admin: Clients primary/preferred language (or SMS ?lang=).
    * New customer: contact.language from the one-time picker.
    */
   function applySessionLanguage(opts) {
@@ -78,6 +93,18 @@
       if (typeof I18n.applyCustomerLang === "function") {
         I18n.applyCustomerLang(state.customer, {
           source: options.source || "customer",
+          silent: options.silent !== false,
+          force: Boolean(options.force),
+        });
+      } else {
+        const lang =
+          customerLang(state.customer) ||
+          normalizeLang(params.get("lang")) ||
+          "en";
+        I18n.setLang(lang, {
+          source: options.source || "customer",
+          persist: false,
+          updateUrl: false,
           silent: options.silent !== false,
           force: Boolean(options.force),
         });
@@ -689,11 +716,19 @@
     state.isNewCustomer = false;
   }
 
+  function currentUiLang() {
+    if (I18n && typeof I18n.getLang === "function") {
+      return normalizeLang(I18n.getLang()) || "en";
+    }
+    return (
+      normalizeLang(params.get("lang") || params.get("locale")) || "en"
+    );
+  }
+
   function startNewCustomer() {
     state.orderMode = "new";
     state.isNewCustomer = true;
-    const initialLang =
-      normalizeLang(params.get("lang") || params.get("locale")) || "en";
+    const initialLang = currentUiLang();
     state.customer = {
       qboCustomerId: "",
       name: "",
@@ -767,12 +802,12 @@
       frequency: "",
       frequencyNote: "",
       address: "",
-      language: normalizeLang(params.get("lang")) || "en",
+      language: currentUiLang(),
     };
     if (els.notesInput) els.notesInput.value = "";
     if (els.searchInput) els.searchInput.value = "";
     writeContactFields();
-    // Landing uses default/URL language only (no customer preference yet)
+    // Keep the language the visitor already chose (default English)
     if (I18n) {
       I18n.setLang(state.contact.language, {
         source: "landing",
@@ -876,7 +911,7 @@
     if (!d) applyComputedDeliveryDate(customer);
     // SMS can still override if sheet language is empty / Make passes lang
     const urlLang = normalizeLang(params.get("lang") || params.get("locale"));
-    if (urlLang && !normalizeLang(customer.preferredLanguage || customer.language)) {
+    if (urlLang && !customerLang(customer)) {
       customer.preferredLanguage = urlLang;
       customer.language = urlLang;
     }
@@ -1231,9 +1266,47 @@
     el.classList.toggle("hidden", !on);
   }
 
+  /** Landing + new-customer flows may pick EN/ES. Returning accounts follow Clients. */
+  function visitorCanChooseLanguage() {
+    if (isAdmin) return false;
+    if (state.loading || state.submitted) return false;
+    if (state.orderMode === "returning" || state.orderMode === "admin") {
+      return false;
+    }
+    return (
+      state.orderMode === "none" ||
+      state.isNewCustomer ||
+      state.orderMode === "new"
+    );
+  }
+
+  function syncLangSwitcherVisibility() {
+    show(document.getElementById("headerLangSwitch"), visitorCanChooseLanguage());
+  }
+
+  function rememberVisitorLanguage(lang) {
+    const l = normalizeLang(lang) || currentUiLang();
+    if (
+      state.orderMode !== "none" &&
+      !state.isNewCustomer &&
+      state.orderMode !== "new"
+    ) {
+      return;
+    }
+    state.contact.language = l;
+    if (state.customer && (state.isNewCustomer || state.orderMode === "new")) {
+      state.customer.preferredLanguage = l;
+      state.customer.language = l;
+    }
+    if (els.contactLanguage) els.contactLanguage.value = l;
+  }
+
   function renderShell() {
     show(els.loadingScreen, state.loading);
-    if (state.loading) return;
+    if (state.loading) {
+      syncLangSwitcherVisibility();
+      return;
+    }
 
     if (state.submitted) {
       show(els.main, false);
@@ -1242,6 +1315,7 @@
       show(els.successScreen, true);
       show(els.errorScreen, false);
       document.querySelector(".summary-bar")?.classList.add("hidden");
+      syncLangSwitcherVisibility();
       return;
     }
 
@@ -1265,6 +1339,7 @@
       show(els.main, false);
       show(els.adminGate, false);
       document.querySelector(".summary-bar")?.classList.add("hidden");
+      syncLangSwitcherVisibility();
       return;
     }
 
@@ -1330,6 +1405,7 @@
     }
 
     show(els.contactSection, isNew && !isAdmin);
+    syncLangSwitcherVisibility();
     // Allow leaving accidental "new customer" path
     show(els.modeSwitchNew, isNew && !isAdmin);
     // Returning (phone path or locked SMS link) can return home
@@ -2575,8 +2651,12 @@
     els.declineBtnTop?.addEventListener("click", onDeclinePeriod);
     els.declineBtnBar?.addEventListener("click", onDeclinePeriod);
 
-    // Re-apply UI copy when EN/ES is toggled
-    window.addEventListener("disfruta:lang", () => {
+    // Re-apply UI copy when EN/ES is toggled (landing + new customer)
+    window.addEventListener("disfruta:lang", (e) => {
+      const lang =
+        (e && e.detail && e.detail.lang) ||
+        (I18n && typeof I18n.getLang === "function" ? I18n.getLang() : "en");
+      rememberVisitorLanguage(lang);
       if (I18n && typeof I18n.applyDom === "function") I18n.applyDom();
       if (!state.loading && !state.submitted) {
         enterOrderUI();
@@ -2647,9 +2727,7 @@
           : state.customer?.address || "",
         preferredLanguage: isNew
           ? normalizeLang(state.contact.language) || "en"
-          : normalizeLang(
-              state.customer?.preferredLanguage || state.customer?.language
-            ) ||
+          : customerLang(state.customer) ||
             (I18n && typeof I18n.getLang === "function"
               ? I18n.getLang()
               : "en"),

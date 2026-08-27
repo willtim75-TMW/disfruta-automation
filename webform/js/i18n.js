@@ -10,7 +10,8 @@
  * Returning customers: served only their preferred language (no header toggle).
  * New customers: choose language once on the contact form.
  *
- * Header EN|ES toggle is commented out in HTML (kept for future debugging).
+ * Header EN|ES toggle is shown for landing + new customers (default English).
+ * Returning customers: no toggle — UI follows Clients primary language.
  * setLang(lang, { source: "customer"|"url"|"new-user"|"manual" })
  */
 (function () {
@@ -892,16 +893,22 @@
     return lang;
   }
 
+  /** Preferred / primary language stored on a customer record. */
+  function langFromCustomer(customer) {
+    if (!customer || typeof customer !== "object") return "";
+    return normalizeLang(
+      customer.preferredLanguage ||
+        customer.primaryLanguage ||
+        customer.language ||
+        customer.lang ||
+        ""
+    );
+  }
+
   /** Apply a customer's preferred language (Clients sheet / payload). */
   function applyCustomerLang(customer, opts) {
     const options = opts || {};
-    const fromCustomer = normalizeLang(
-      customer &&
-        (customer.preferredLanguage ||
-          customer.language ||
-          customer.lang ||
-          "")
-    );
+    const fromCustomer = langFromCustomer(customer);
     let fromUrl = "";
     try {
       const params = new URLSearchParams(window.location.search);
@@ -923,18 +930,20 @@
   }
 
   /**
-   * Header EN|ES toggle — only active if the switcher markup is present.
-   * Toggle is commented out in HTML; kept here for future use.
+   * EN|ES toggle — used on landing and the new-customer form.
+   * Returning / admin sessions hide the switcher and ignore these clicks.
    */
   function bindSwitcher() {
     document.addEventListener("click", (e) => {
       const btn =
         e.target && e.target.closest && e.target.closest("[data-set-lang]");
       if (!btn) return;
+      const switcher = btn.closest(".lang-switch");
+      if (switcher && switcher.classList.contains("hidden")) return;
       e.preventDefault();
       setLang(btn.getAttribute("data-set-lang"), {
         source: "manual",
-        persist: true,
+        persist: false,
         updateUrl: false,
       });
     });
@@ -958,6 +967,7 @@
     getLocale,
     setLang,
     applyCustomerLang,
+    langFromCustomer,
     normalizeLang,
     applyDom,
     categoryLabel,

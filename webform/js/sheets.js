@@ -93,6 +93,9 @@
     preferredLanguage: [
       "preferred language",
       "preferred_language",
+      "primary language",
+      "primary_language",
+      "primary lang",
       "language",
       "lang",
       "idioma",
@@ -123,6 +126,18 @@
       "prev qty",
     ],
   };
+
+  /** Preferred / primary language from a mapped client or JSON record. */
+  function languageFromRecord(c) {
+    if (!c || typeof c !== "object") return "";
+    return normalizeLanguage(
+      c.preferredLanguage ||
+        c.primaryLanguage ||
+        c.language ||
+        c.lang ||
+        ""
+    );
+  }
 
   /** Normalize Clients sheet language → "en" | "es" (empty if unknown). */
   function normalizeLanguage(raw) {
@@ -1066,14 +1081,8 @@
                 lastOrderDate: c.lastOrderDate || "",
                 nextDeliveryDate: c.nextDeliveryDate || "",
                 firstName: c.firstName || "",
-                preferredLanguage:
-                  normalizeLanguage(
-                    c.preferredLanguage || c.language || c.lang || ""
-                  ) || "en",
-                language:
-                  normalizeLanguage(
-                    c.preferredLanguage || c.language || c.lang || ""
-                  ) || "en",
+                preferredLanguage: languageFromRecord(c) || "en",
+                language: languageFromRecord(c) || "en",
                 pin: String(c.pin || c.accessPin || c.password || "").trim(),
                 accessPin: String(
                   c.pin || c.accessPin || c.password || ""
@@ -1095,10 +1104,7 @@
     } else {
       // ensure consistent shape
       clients = (clients || []).map((c) => {
-        const preferredLanguage =
-          normalizeLanguage(
-            c.preferredLanguage || c.language || c.lang || ""
-          ) || "en";
+        const preferredLanguage = languageFromRecord(c) || "en";
         const pin = String(c.pin || c.accessPin || c.password || "").trim();
         return {
           qboCustomerId: String(c.qboCustomerId || c.id || ""),

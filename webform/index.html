@@ -39,15 +39,17 @@
           />
         </button>
         <span class="header-spacer" aria-hidden="true"></span>
-        <!--
-          Language toggle (disabled): returning customers get preferred language
-          from the Clients sheet / SMS ?lang=. New customers pick language once
-          on the contact form. Uncomment if manual override is needed later.
-        <div class="lang-switch" role="group" data-i18n-aria-label="header.lang_label" aria-label="Language">
+        <!-- Visible for landing + new customers (default English). Hidden once a returning customer is loaded. -->
+        <div
+          class="lang-switch hidden"
+          id="headerLangSwitch"
+          role="group"
+          data-i18n-aria-label="header.lang_label"
+          aria-label="Language"
+        >
           <button type="button" class="lang-btn" data-set-lang="en" aria-pressed="true">EN</button>
           <button type="button" class="lang-btn" data-set-lang="es" aria-pressed="false">ES</button>
         </div>
-        -->
         <span class="badge" id="headerBadge" data-i18n="header.badge_weekly">Weekly order</span>
       </div>
     </header>
@@ -72,6 +74,23 @@
         Place a new wholesale order, or reopen your usual order with a
         personalized link or phone lookup.
       </p>
+
+      <div class="landing-lang" id="landingLang">
+        <p class="landing-lang-label" data-i18n="contact.language">Preferred language</p>
+        <div
+          class="lang-switch lang-switch-lg"
+          role="group"
+          data-i18n-aria-label="header.lang_label"
+          aria-label="Language"
+        >
+          <button type="button" class="lang-btn" data-set-lang="en" aria-pressed="true">
+            English
+          </button>
+          <button type="button" class="lang-btn" data-set-lang="es" aria-pressed="false">
+            Español
+          </button>
+        </div>
+      </div>
 
       <div class="landing-actions">
         <button type="button" class="btn btn-primary btn-block" id="startNewBtn" data-i18n="landing.new_btn">
@@ -287,6 +306,36 @@
         </p>
         <div class="card contact-card">
           <div class="field-grid">
+            <div class="field field-full" id="contactLanguageField">
+              <span class="field-label" id="contactLanguageLabel" data-i18n="contact.language"
+                >Preferred language</span
+              >
+              <div
+                class="lang-switch lang-switch-lg"
+                role="group"
+                aria-labelledby="contactLanguageLabel"
+              >
+                <button
+                  type="button"
+                  class="lang-btn"
+                  data-set-lang="en"
+                  data-i18n="contact.lang_en"
+                >
+                  English
+                </button>
+                <button type="button" class="lang-btn" data-set-lang="es">Español</button>
+              </div>
+              <select
+                id="contactLanguage"
+                class="sr-only"
+                tabindex="-1"
+                aria-hidden="true"
+                autocomplete="language"
+              >
+                <option value="en" selected>English</option>
+                <option value="es">Español</option>
+              </select>
+            </div>
             <div class="field field-full">
               <label class="field-label" for="contactName" data-i18n="contact.name"
                 >Business / customer name *</label
@@ -373,15 +422,6 @@
               <p class="field-hint" data-i18n="contact.freq_other_hint">
                 Tell us how often you want deliveries so we can set up the right schedule.
               </p>
-            </div>
-            <div class="field">
-              <label class="field-label" for="contactLanguage" data-i18n="contact.language"
-                >Preferred language</label
-              >
-              <select id="contactLanguage" autocomplete="language">
-                <option value="en" data-i18n-value="contact.lang_en">English</option>
-                <option value="es" data-i18n-value="contact.lang_es">Español</option>
-              </select>
             </div>
             <div class="field field-full">
               <label class="field-label" for="contactAddress" data-i18n="contact.address"
