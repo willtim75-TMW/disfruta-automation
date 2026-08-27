@@ -1,0 +1,5 @@
+quickbooks_id,customer_name,contact_name,phone,email,is_primary
+24,Mercado Latino Fresh,Ana Ruiz,+15551234001,orders@mercadolatino.example,Yes
+24,Mercado Latino Fresh,Luis Mercado,+15551234901,luis@mercadolatino.example,No
+31,La Casa Market,Manager,+15551234002,manager@lacasamarket.example,Yes
+48,El Rincon Restaurant,Kitchen,+15551234003,kitchen@elrincon.example,Yes

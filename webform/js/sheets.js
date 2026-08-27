@@ -66,8 +66,15 @@
       "client id",
     ],
     customerName: ["customer name", "client name", "name", "customer", "client"],
+    contactName: ["contact name", "contact", "person name", "person"],
+    firstName: ["first name", "first_name", "firstname"],
+    isPrimary: ["is primary", "is_primary", "primary", "main contact"],
     phone: ["phone number", "phone", "mobile", "cell", "telephone"],
     email: ["email", "e-mail", "email address"],
+    timestamp: ["timestamp", "submitted at", "submittedat", "created at"],
+    orderId: ["order id", "order_id", "orderid"],
+    status: ["status", "order status"],
+    declined: ["declined", "decline", "skipped"],
     frequency: ["frequency", "order frequency", "cadence"],
     dayOfWeek: [
       "day of week",
@@ -90,6 +97,14 @@
       "lang",
       "idioma",
       "locale",
+    ],
+    preferredCategories: [
+      "preferred categories",
+      "preferred_categories",
+      "preferred category",
+      "categories",
+      "category preferences",
+      "usual categories",
     ],
     pin: [
       "pin",
@@ -175,6 +190,35 @@
       return true;
     // blank active column treated as active
     return s === "" ? true : Boolean(s);
+  }
+
+  function parsePreferredCategories(raw) {
+    if (Array.isArray(raw)) {
+      return raw.flatMap(parsePreferredCategories);
+    }
+    return String(raw || "")
+      .split(/[,;|/\n]+/)
+      .map((s) => s.replace(/^["'\s]+|["'\s]+$/g, "").trim())
+      .filter(Boolean);
+  }
+
+  function canonicalizePreferredCategories(list, products) {
+    const present = new Map();
+    (products || []).forEach((p) => {
+      const c = String((p && p.category) || "General").trim() || "General";
+      present.set(c.toLowerCase(), c);
+    });
+    const out = [];
+    const used = new Set();
+    (list || []).forEach((raw) => {
+      const key = String(raw || "").trim().toLowerCase();
+      const canon = present.get(key);
+      if (canon && !used.has(canon)) {
+        out.push(canon);
+        used.add(canon);
+      }
+    });
+    return out;
   }
 
   function numberish(v) {
@@ -562,6 +606,7 @@
     return {
       qboCustomerId: String(qboCustomerId || ""),
       name: String(name || `Customer ${qboCustomerId}`),
+      firstName: String(pick(row, "firstName") || ""),
       phone: String(pick(row, "phone") || ""),
       email: String(pick(row, "email") || ""),
       frequency: String(pick(row, "frequency") || ""),
@@ -574,8 +619,99 @@
       accessPin: pin,
       active: activeRaw === "" ? true : truthy(activeRaw),
       notes: String(pick(row, "notes") || ""),
+      preferredCategories: parsePreferredCategories(pick(row, "preferredCategories")),
       previousOrder: [],
+      contacts: [],
     };
+  }
+
+  function mapContact(row) {
+    const qboCustomerId = String(pick(row, "qboCustomerId") || "");
+    const contactName = String(pick(row, "contactName") || "");
+    const phone = String(pick(row, "phone") || "");
+    const email = String(pick(row, "email") || "");
+    if (!qboCustomerId && !contactName && !phone) return null;
+    return {
+      qboCustomerId,
+      customerName: String(pick(row, "customerName") || ""),
+      contactName: contactName || String(pick(row, "customerName") || ""),
+      phone,
+      email,
+      isPrimary: truthy(pick(row, "isPrimary")),
+    };
+  }
+
+  function mapOrderLog(row) {
+    const qboCustomerId = String(pick(row, "qboCustomerId") || "");
+    const deliveryDate = String(pick(row, "nextDeliveryDate") || "").slice(
+      0,
+      10
+    );
+    if (!qboCustomerId && !deliveryDate) return null;
+    const status = String(pick(row, "status") || "")
+      .trim()
+      .toLowerCase();
+    return {
+      qboCustomerId,
+      customerName: String(pick(row, "customerName") || ""),
+      phone: String(pick(row, "phone") || ""),
+      email: String(pick(row, "email") || ""),
+      deliveryDate,
+      status,
+      declined: truthy(pick(row, "declined")) || status === "declined",
+      submittedAt: String(pick(row, "timestamp") || ""),
+      orderId: String(pick(row, "orderId") || ""),
+    };
+  }
+
+  function inferContactsFromClient(c) {
+    const phone = String((c && c.phone) || "");
+    const email = String((c && c.email) || "");
+    if (!phone && !email) return [];
+    return [
+      {
+        qboCustomerId: String((c && c.qboCustomerId) || ""),
+        customerName: String((c && c.name) || ""),
+        contactName: String((c && (c.firstName || c.name)) || ""),
+        phone,
+        email,
+        isPrimary: true,
+        inferred: true,
+      },
+    ];
+  }
+
+  function attachContacts(clients, contactRows) {
+    const byCustomer = new Map();
+    (contactRows || []).forEach((ct) => {
+      if (!ct) return;
+      const id = String(ct.qboCustomerId || "");
+      if (!id) return;
+      if (!byCustomer.has(id)) byCustomer.set(id, []);
+      byCustomer.get(id).push(ct);
+    });
+
+    return (clients || []).map((c) => {
+      const id = String((c && c.qboCustomerId) || "");
+      let list = byCustomer.get(id);
+      if (!list || !list.length) {
+        list =
+          Array.isArray(c.contacts) && c.contacts.length
+            ? c.contacts
+            : inferContactsFromClient(c);
+      }
+      if (list.length && !list.some((x) => x && x.isPrimary)) {
+        list = list.map((x, i) => ({ ...x, isPrimary: i === 0 }));
+      }
+      const primary = list.find((x) => x && x.isPrimary) || list[0] || null;
+      return {
+        ...c,
+        contacts: list,
+        // Keep Clients phone/email when present; otherwise use primary contact
+        phone: c.phone || (primary && primary.phone) || "",
+        email: c.email || (primary && primary.email) || "",
+      };
+    });
   }
 
   function mapPreviousLine(row) {
@@ -719,7 +855,13 @@
     const apiKey = sheets.apiKey || "";
     const localProductsUrl = cfg.productsUrl || "./data/products.json";
 
-    const sources = { products: null, clients: null, previous: null };
+    const sources = {
+      products: null,
+      clients: null,
+      previous: null,
+      contacts: null,
+      orders: null,
+    };
 
     // --- Products ---
     let products = [];
@@ -923,6 +1065,7 @@
                 dayOfWeek: c.dayOfWeek || "",
                 lastOrderDate: c.lastOrderDate || "",
                 nextDeliveryDate: c.nextDeliveryDate || "",
+                firstName: c.firstName || "",
                 preferredLanguage:
                   normalizeLanguage(
                     c.preferredLanguage || c.language || c.lang || ""
@@ -937,7 +1080,11 @@
                 ).trim(),
                 active: c.active !== false,
                 notes: c.notes || "",
+                preferredCategories: parsePreferredCategories(
+                  c.preferredCategories
+                ),
                 previousOrder: c.previousOrder || [],
+                contacts: Array.isArray(c.contacts) ? c.contacts : [],
               }
             : c
         ),
@@ -962,36 +1109,116 @@
           dayOfWeek: c.dayOfWeek || "",
           lastOrderDate: c.lastOrderDate || "",
           nextDeliveryDate: c.nextDeliveryDate || "",
+          firstName: c.firstName || "",
           preferredLanguage,
           language: preferredLanguage,
           pin,
           accessPin: pin,
           active: c.active !== false,
           notes: c.notes || "",
+          preferredCategories: parsePreferredCategories(
+            c.preferredCategories
+          ),
           previousOrder: c.previousOrder || [],
+          contacts: Array.isArray(c.contacts) ? c.contacts : [],
         };
       });
     }
 
     clients = clients.filter((c) => c.active !== false);
+    clients = clients.map((c) => ({
+      ...c,
+      preferredCategories: canonicalizePreferredCategories(
+        c.preferredCategories,
+        products
+      ),
+    }));
+
+    // --- Contacts (optional; fall back to Clients phone/email) ---
+    let contactRows = [];
+    if (enabled && spreadsheetId) {
+      try {
+        const result = await loadSheetRows({
+          csvUrl: sheets.contactsCsvUrl || "",
+          spreadsheetId,
+          gid: sheets.contactsGid,
+          sheetName: sheets.contactsSheet || "Contacts",
+          apiKey,
+          fallbackUrl: "",
+          label: "Contacts",
+          requireRows: false,
+        });
+        sources.contacts = result.source;
+        contactRows = (result.rows || []).map(mapContact).filter(Boolean);
+      } catch (err) {
+        console.warn(
+          "[DisFruta] Contacts sheet not loaded (optional):",
+          err.message || err
+        );
+        sources.contacts = "skipped";
+      }
+    }
+    clients = attachContacts(clients, contactRows);
+
+    // --- Orders log (duplicate-order guard) ---
+    let orders = [];
+    if (enabled && spreadsheetId) {
+      try {
+        orders = await loadOrderLog(cfg);
+        sources.orders = "sheets";
+      } catch (err) {
+        console.warn(
+          "[DisFruta] Orders sheet not loaded (optional duplicate check):",
+          err.message || err
+        );
+        sources.orders = "skipped";
+        orders = [];
+      }
+    }
 
     return {
       products,
       customers: clients,
+      orders,
       sources,
       meta: {
         productCount: products.length,
         customerCount: clients.length,
         previousLineCount: previousLines.length,
+        contactCount: contactRows.length,
+        orderLogCount: orders.length,
       },
     };
   }
 
+  async function loadOrderLog(cfg) {
+    const sheets = (cfg && cfg.googleSheets) || {};
+    const spreadsheetId = sheets.spreadsheetId || "";
+    const apiKey = sheets.apiKey || "";
+    const result = await loadSheetRows({
+      csvUrl: sheets.ordersCsvUrl || "",
+      spreadsheetId,
+      gid: sheets.ordersGid,
+      sheetName: sheets.ordersSheet || "Orders",
+      apiKey,
+      fallbackUrl: "",
+      label: "Orders",
+      requireRows: false,
+    });
+    return (result.rows || []).map(mapOrderLog).filter(Boolean);
+  }
+
   global.DisfrutaSheets = {
     loadCatalog,
+    loadOrderLog,
     parseCsv,
     mapProduct,
     mapClient,
+    mapContact,
+    mapOrderLog,
+    attachContacts,
+    parsePreferredCategories,
+    canonicalizePreferredCategories,
     normalizeHeader,
   };
 })(window);

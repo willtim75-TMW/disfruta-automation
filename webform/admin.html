@@ -142,6 +142,54 @@
         </div>
       </section>
 
+      <section
+        class="section already-ordered-section hidden"
+        id="alreadyOrderedSection"
+        aria-labelledby="alreadyOrderedHeading"
+      >
+        <div class="already-ordered-card">
+          <div class="decline-copy">
+            <h3 id="alreadyOrderedHeading" data-i18n="already.heading">
+              Order already submitted
+            </h3>
+            <p id="alreadyOrderedBody" data-i18n="already.body">
+              An order is already in for this delivery. The first submission
+              wins — additional orders from this account are not accepted.
+            </p>
+            <p class="section-sub" data-i18n="already.help">
+              If you need to change it, contact DisFruta.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="section contact-picker-section hidden"
+        id="orderContactSection"
+        aria-labelledby="orderContactHeading"
+      >
+        <div class="section-head">
+          <h3 id="orderContactHeading" data-i18n="order_contact.heading">
+            Who is placing this order?
+          </h3>
+        </div>
+        <p class="section-sub" data-i18n="order_contact.sub">
+          More than one person is listed for this account. Choose who is
+          ordering today.
+        </p>
+        <div class="card contact-card">
+          <div class="field field-full">
+            <label
+              class="field-label"
+              for="orderContactSelect"
+              data-i18n="order_contact.label"
+              >Contact</label
+            >
+            <select id="orderContactSelect"></select>
+          </div>
+        </div>
+      </section>
+
       <div class="notice" id="cutoffNotice" role="note" data-order-body>
         <p class="notice-primary">
           <strong data-i18n-html="notice.cutoff"
@@ -171,6 +219,16 @@
         <div class="section-head">
           <h3 id="browseHeading" data-i18n="browse.heading">Add More Items</h3>
           <span class="count" id="browseCount">0 products</span>
+        </div>
+        <p class="section-sub" id="browseSub" data-i18n-html="browse.sub">
+          Search the <strong>full catalog</strong> anytime (all categories), or
+          pick a category chip to browse that group.
+        </p>
+        <div class="browse-scope hidden" id="browseScopeBar">
+          <p class="browse-scope-copy" id="browseScopeCopy"></p>
+          <button type="button" class="btn btn-secondary" id="browseAllBtn">
+            Add other items
+          </button>
         </div>
         <div class="search-wrap">
           <label class="sr-only" for="searchInput" data-i18n="browse.search_label">Search all products</label>

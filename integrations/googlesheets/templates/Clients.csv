@@ -1,4 +1,4 @@
-QuickBooks ID,Customer Name,Phone Number,Email,Frequency,Day of Week,Next Delivery Date,Last Order Date,Preferred Language,Active,Notes
-24,Mercado Latino Fresh,+15551234001,orders@mercadolatino.example,Weekly,Wednesday,2026-07-15,2026-07-08,es,Yes,
-31,La Casa Market,+15551234002,manager@lacasamarket.example,Twice Weekly,Tuesday,2026-07-14,2026-07-07,en,Yes,
-48,El Rincon Restaurant,+15551234003,kitchen@elrincon.example,Weekly,Friday,2026-07-17,2026-07-10,es,Yes,
+QuickBooks ID,Customer Name,Phone Number,Email,Frequency,Day of Week,Next Delivery Date,Last Order Date,Preferred Language,Preferred Categories,Active,Notes
+24,Mercado Latino Fresh,+15551234001,orders@mercadolatino.example,Weekly,Wednesday,2026-07-15,2026-07-08,es,"Frozen Fruit Pulps 14 Oz, Frozen Fruit Pulps 32 Oz, Frozen Food",Yes,
+31,La Casa Market,+15551234002,manager@lacasamarket.example,Twice Weekly,Tuesday,2026-07-14,2026-07-07,en,"Dry Food, Soda/Drinks",Yes,
+48,El Rincon Restaurant,+15551234003,kitchen@elrincon.example,Weekly,Friday,2026-07-17,2026-07-10,es,"Frozen Fruit Pulps 14 Oz, Frozen Fruit Pulps 32 Oz, Frozen Fruit Pulps 64 Oz, Frozen Food",Yes,

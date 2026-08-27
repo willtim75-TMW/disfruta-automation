@@ -91,6 +91,9 @@
     productsByName: new Map(),
     customers: [],
     customer: null,
+    selectedContact: null,
+    orders: [],
+    existingOrder: null,
     /** @type {'none'|'new'|'returning'|'admin'} */
     orderMode: "none",
     isNewCustomer: false,
@@ -99,11 +102,16 @@
       phone: "",
       email: "",
       deliveryDay: "",
+      frequency: "",
+      frequencyNote: "",
       address: "",
       language: "en",
     },
     cart: new Map(),
     category: "All",
+    /** When false and preferredCategories is set, browse is limited to those */
+    browseAll: true,
+    preferredCategories: [],
     search: "",
     notes: "",
     loading: true,
@@ -164,6 +172,198 @@
     return key ? t(key) : day;
   }
 
+  const WEEKDAY_INDEX = {
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+  };
+
+  /** First weekday name from sheet values like "Tuesday, Friday". */
+  function parseWeekdayIndex(day) {
+    const first = String(day || "")
+      .split(/[,/&]| and /i)[0]
+      .trim()
+      .toLowerCase();
+    return Object.prototype.hasOwnProperty.call(WEEKDAY_INDEX, first)
+      ? WEEKDAY_INDEX[first]
+      : null;
+  }
+
+  /**
+   * Cadence length in days. "Every 3 weeks" is 21 so subsequent deliveries
+   * stay on the same weekday three weeks apart.
+   */
+  function frequencyIntervalDays(frequency) {
+    const f = String(frequency || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[_-]+/g, " ");
+    if (!f) return 7;
+    if (/\btwice\b/.test(f)) return 3;
+    if (/\bother\b/.test(f)) return 7;
+    if (/\b3\b/.test(f) && /week/.test(f)) return 21;
+    if (/\bevery 3\b/.test(f)) return 21;
+    if (/\bbi\b/.test(f) || /every 2/.test(f) || /fortnight/.test(f)) return 14;
+    if (/month/.test(f) || (/every 4/.test(f) && /week/.test(f))) return 28;
+    if (/week/.test(f)) return 7;
+    return 7;
+  }
+
+  function startOfLocalDay(d) {
+    const src = d instanceof Date ? d : new Date();
+    return new Date(src.getFullYear(), src.getMonth(), src.getDate(), 12, 0, 0);
+  }
+
+  function addDays(d, n) {
+    const x = startOfLocalDay(d);
+    x.setDate(x.getDate() + (Number(n) || 0));
+    return x;
+  }
+
+  function toIsoDate(d) {
+    if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  function parseIsoDate(iso) {
+    const s = String(iso || "").trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    const d = new Date(`${s}T12:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function sameLocalDay(a, b) {
+    return (
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate()
+    );
+  }
+
+  function nextWeekdayOnOrAfter(fromDate, weekdayIndex) {
+    const d = startOfLocalDay(fromDate);
+    if (weekdayIndex == null) return d;
+    const delta = (weekdayIndex - d.getDay() + 7) % 7;
+    return addDays(d, delta);
+  }
+
+  function isPastOrderCutoff(deliveryDate, now) {
+    const today = startOfLocalDay(now);
+    if (sameLocalDay(deliveryDate, today)) return true;
+    const cutoffHour = Number(cfg.cutoffHour);
+    const hour = Number.isFinite(cutoffHour) ? cutoffHour : 17;
+    const tomorrow = addDays(today, 1);
+    return sameLocalDay(deliveryDate, tomorrow) && now.getHours() >= hour;
+  }
+
+  function frequencyBadgeKey(frequency) {
+    const f = String(frequency || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[_-]+/g, " ");
+    if (!f) return "header.badge_weekly";
+    if (/\btwice\b/.test(f)) return "header.badge_twice";
+    if (/\bother\b/.test(f)) return "header.badge_other";
+    if ((/\b3\b/.test(f) && /week/.test(f)) || /\bevery 3\b/.test(f)) {
+      return "header.badge_3weeks";
+    }
+    if (/\bbi\b/.test(f) || /every 2/.test(f) || /fortnight/.test(f)) {
+      return "header.badge_biweekly";
+    }
+    if (/month/.test(f) || (/every 4/.test(f) && /week/.test(f))) {
+      return "header.badge_monthly";
+    }
+    return "header.badge_weekly";
+  }
+
+  /**
+   * Next delivery date from preferred weekday + cadence.
+   * Recurring (has lastOrderDate): last + interval (21 days for Every 3 weeks).
+   * First order: next available preferred weekday, respecting 5 PM cutoff.
+   */
+  function computeNextDeliveryDate(opts) {
+    const options = opts || {};
+    const now =
+      options.now instanceof Date && !Number.isNaN(options.now.getTime())
+        ? options.now
+        : new Date();
+    const weekdayIndex = parseWeekdayIndex(
+      options.dayOfWeek || options.preferredDay || ""
+    );
+    const interval = frequencyIntervalDays(options.frequency);
+    const today = startOfLocalDay(now);
+    const last = parseIsoDate(options.lastOrderDate);
+    const hasLast = Boolean(last);
+
+    let candidate;
+    if (hasLast) {
+      candidate = addDays(last, interval);
+      while (candidate < today) candidate = addDays(candidate, interval);
+    } else {
+      candidate = today;
+    }
+
+    if (weekdayIndex != null) {
+      candidate = nextWeekdayOnOrAfter(candidate, weekdayIndex);
+    } else if (!hasLast) {
+      return "";
+    }
+
+    const skipDays = hasLast ? interval : 7;
+    if (isPastOrderCutoff(candidate, now)) {
+      candidate = addDays(candidate, skipDays);
+      if (weekdayIndex != null) {
+        candidate = nextWeekdayOnOrAfter(candidate, weekdayIndex);
+      }
+    }
+    return toIsoDate(candidate);
+  }
+
+  function applyComputedDeliveryDate(customer, opts) {
+    if (!customer) return "";
+    const options = opts || {};
+    const existing = String(customer.nextDeliveryDate || "").trim();
+    const existingDate = parseIsoDate(existing);
+    const now = options.now instanceof Date ? options.now : new Date();
+    if (
+      existingDate &&
+      !options.force &&
+      !isPastOrderCutoff(existingDate, now) &&
+      existingDate >= startOfLocalDay(now)
+    ) {
+      return existing;
+    }
+    const iso = computeNextDeliveryDate({
+      dayOfWeek: customer.dayOfWeek,
+      frequency: customer.frequency,
+      lastOrderDate: customer.lastOrderDate,
+      now,
+    });
+    if (iso) customer.nextDeliveryDate = iso;
+    return iso || existing;
+  }
+
+  function isOtherFrequency(frequency) {
+    return String(frequency || "").trim().toLowerCase() === "other";
+  }
+
+  function syncFrequencyOtherField() {
+    const other = isOtherFrequency(
+      state.contact.frequency || els.contactFrequency?.value
+    );
+    show(els.contactFrequencyOtherField, other);
+    if (!other && els.contactFrequencyOther) {
+      els.contactFrequencyOther.classList.remove("invalid");
+    }
+  }
+
   function toast(msg) {
     let t = document.getElementById("toast");
     if (!t) {
@@ -201,11 +401,143 @@
     return false;
   }
 
+  function customerContacts(customer) {
+    if (!customer || !Array.isArray(customer.contacts)) return [];
+    return customer.contacts.filter(Boolean);
+  }
+
+  function contactKey(ct) {
+    if (!ct) return "";
+    return [
+      String(ct.qboCustomerId || ""),
+      normalizePhone(ct.phone),
+      String(ct.contactName || "").trim().toLowerCase(),
+    ].join("|");
+  }
+
+  function primaryContact(customer) {
+    const list = customerContacts(customer);
+    return list.find((c) => c.isPrimary) || list[0] || null;
+  }
+
+  function findContactByPhone(customer, phone) {
+    return (
+      customerContacts(customer).find((c) => phonesMatch(c.phone, phone)) ||
+      null
+    );
+  }
+
+  function resolveHintedContact(customer) {
+    if (!customer) return null;
+    const phoneHint =
+      params.get("contactPhone") ||
+      params.get("cphone") ||
+      params.get("phone") ||
+      "";
+    const nameHint = String(
+      params.get("contact") || params.get("contactName") || ""
+    )
+      .trim()
+      .toLowerCase();
+    const list = customerContacts(customer);
+    if (phoneHint) {
+      const byPhone = list.find((c) => phonesMatch(c.phone, phoneHint));
+      if (byPhone) return byPhone;
+    }
+    if (nameHint) {
+      const byName = list.find(
+        (c) => String(c.contactName || "").trim().toLowerCase() === nameHint
+      );
+      if (byName) return byName;
+    }
+    return primaryContact(customer);
+  }
+
+  function selectContact(contact) {
+    state.selectedContact = contact || null;
+  }
+
   function findCustomerByPhone(phone) {
     return (
-      state.customers.find(
-        (c) => c.active !== false && phonesMatch(c.phone, phone)
-      ) || null
+      state.customers.find((c) => {
+        if (c.active === false) return false;
+        if (phonesMatch(c.phone, phone)) return true;
+        return customerContacts(c).some((ct) => phonesMatch(ct.phone, phone));
+      }) || null
+    );
+  }
+
+  function parseCategoryList(raw) {
+    if (
+      window.DisfrutaSheets &&
+      typeof window.DisfrutaSheets.parsePreferredCategories === "function"
+    ) {
+      return window.DisfrutaSheets.parsePreferredCategories(raw);
+    }
+    if (Array.isArray(raw)) return raw.flatMap(parseCategoryList);
+    return String(raw || "")
+      .split(/[,;|/\n]+/)
+      .map((s) => s.replace(/^["'\s]+|["'\s]+$/g, "").trim())
+      .filter(Boolean);
+  }
+
+  function catalogCategoryMap() {
+    const map = new Map();
+    (state.products || []).forEach((p) => {
+      const c = String((p && p.category) || "General").trim() || "General";
+      map.set(c.toLowerCase(), c);
+    });
+    return map;
+  }
+
+  function canonicalizeCategoryList(list) {
+    const present = catalogCategoryMap();
+    const out = [];
+    const used = new Set();
+    parseCategoryList(list).forEach((raw) => {
+      const canon = present.get(String(raw || "").trim().toLowerCase());
+      if (canon && !used.has(canon)) {
+        out.push(canon);
+        used.add(canon);
+      }
+    });
+    return out;
+  }
+
+  function resolvePreferredCategories(customer) {
+    const urlRaw =
+      params.get("preferredCategories") ||
+      params.get("categories") ||
+      params.get("cats") ||
+      "";
+    const fromUrl = canonicalizeCategoryList(urlRaw);
+    if (fromUrl.length) return fromUrl;
+    return canonicalizeCategoryList(
+      customer && customer.preferredCategories
+    );
+  }
+
+  function applyPreferredCategoryScope(customer) {
+    state.preferredCategories = resolvePreferredCategories(customer || null);
+    state.browseAll = state.preferredCategories.length === 0;
+    if (
+      !state.browseAll &&
+      state.category !== "All" &&
+      state.preferredCategories.indexOf(state.category) === -1
+    ) {
+      state.category = "All";
+    }
+  }
+
+  function hasPreferredFilter() {
+    return !state.browseAll && state.preferredCategories.length > 0;
+  }
+
+  function scopedProducts() {
+    if (!hasPreferredFilter()) return (state.products || []).slice();
+    const allow = new Set(state.preferredCategories);
+    return (state.products || []).filter((p) =>
+      allow.has(String((p && p.category) || "General").trim() || "General")
     );
   }
 
@@ -216,6 +548,71 @@
           String(c.qboCustomerId) === String(customerId) ||
           String(c.id) === String(customerId)
       ) || null
+    );
+  }
+
+  function normalizeOrderDate(iso) {
+    return String(iso || "").trim().slice(0, 10);
+  }
+
+  function findExistingOrder(qboId, deliveryDate) {
+    const id = String(qboId || "").trim();
+    const date = normalizeOrderDate(deliveryDate);
+    if (!id || !date) return null;
+    const blocking = new Set([
+      "received",
+      "submitted",
+      "invoiced",
+      "declined",
+    ]);
+    return (
+      (state.orders || []).find((o) => {
+        if (String(o.qboCustomerId) !== id) return false;
+        if (normalizeOrderDate(o.deliveryDate) !== date) return false;
+        const st = String(o.status || "").toLowerCase();
+        if (st === "error") return false;
+        if (o.declined || st === "declined") return true;
+        return !st || blocking.has(st);
+      }) || null
+    );
+  }
+
+  function refreshExistingOrderState() {
+    if (!state.customer || state.isNewCustomer) {
+      state.existingOrder = null;
+      return null;
+    }
+    state.existingOrder = findExistingOrder(
+      state.customer.qboCustomerId,
+      state.customer.nextDeliveryDate
+    );
+    return state.existingOrder;
+  }
+
+  async function reloadOrderLog() {
+    if (
+      !window.DisfrutaSheets ||
+      typeof window.DisfrutaSheets.loadOrderLog !== "function"
+    ) {
+      return state.orders || [];
+    }
+    try {
+      const orders = await window.DisfrutaSheets.loadOrderLog(cfg);
+      if (Array.isArray(orders)) state.orders = orders;
+    } catch (err) {
+      console.warn("[DisFruta] Could not refresh Orders log:", err);
+    }
+    return state.orders || [];
+  }
+
+  function isDuplicateSubmitError(err) {
+    if (!err) return false;
+    if (Number(err.status) === 409) return true;
+    const data = err.data || {};
+    const code = String(data.code || data.error || "").toLowerCase();
+    if (code.includes("duplicate")) return true;
+    return /already (in|submitted|exists)|duplicate order/i.test(
+      String(err.message || data.message || "")
     );
   }
 
@@ -237,6 +634,7 @@
       state.products.map((p) => [String(p.name).trim().toLowerCase(), p])
     );
     state.customers = catalog.customers || [];
+    state.orders = catalog.orders || [];
     state.dataSources = catalog.sources || {};
     state.catalogMeta = catalog.meta || {};
 
@@ -312,16 +710,33 @@
       isNew: true,
     };
     state.cart.clear();
+    selectContact(null);
+    state.existingOrder = null;
+    applyPreferredCategoryScope(null);
     // Prefill contact from URL if Make/ads pass them
     state.contact = {
       name: params.get("name") || params.get("customerName") || "",
       phone: params.get("phone") || "",
       email: params.get("email") || "",
       deliveryDay: params.get("deliveryDay") || params.get("day") || "",
+      frequency:
+        params.get("frequency") || params.get("cadence") || "",
+      frequencyNote:
+        params.get("frequencyNote") ||
+        params.get("frequency_note") ||
+        params.get("cadenceNote") ||
+        "",
       address: params.get("address") || "",
       language: initialLang,
     };
     syncContactToCustomer();
+    const presetDelivery =
+      params.get("deliveryDate") || params.get("nextDelivery") || "";
+    if (presetDelivery) {
+      state.customer.nextDeliveryDate = presetDelivery;
+    } else {
+      applyComputedDeliveryDate(state.customer, { force: true });
+    }
     applySessionLanguage({ silent: true, source: "new-user" });
   }
 
@@ -334,10 +749,13 @@
     state.orderMode = "none";
     state.isNewCustomer = false;
     state.customer = null;
+    state.selectedContact = null;
+    state.existingOrder = null;
     state.cart.clear();
     state.notes = "";
     state.search = "";
     state.category = "All";
+    applyPreferredCategoryScope(null);
     state.awaitingCustomerUnlock = false;
     state.unlockPhonePreverified = false;
     state.adminCustomerLocked = false;
@@ -346,6 +764,8 @@
       phone: "",
       email: "",
       deliveryDay: "",
+      frequency: "",
+      frequencyNote: "",
       address: "",
       language: normalizeLang(params.get("lang")) || "en",
     };
@@ -438,6 +858,11 @@
           params.get("deliveryDate") || params.get("nextDelivery") || "",
         preferredLanguage: lang,
         language: lang,
+        preferredCategories: canonicalizeCategoryList(
+          params.get("preferredCategories") ||
+            params.get("categories") ||
+            ""
+        ),
         previousOrder: [],
         active: true,
       };
@@ -447,6 +872,8 @@
     if (d) customer.nextDeliveryDate = d;
     const n = params.get("name") || params.get("customerName");
     if (n) customer.name = n;
+    // SMS / Make URL is source of truth for this cycle; otherwise derive from cadence
+    if (!d) applyComputedDeliveryDate(customer);
     // SMS can still override if sheet language is empty / Make passes lang
     const urlLang = normalizeLang(params.get("lang") || params.get("locale"));
     if (urlLang && !normalizeLang(customer.preferredLanguage || customer.language)) {
@@ -455,6 +882,9 @@
     }
 
     state.customer = customer;
+    applyPreferredCategoryScope(customer);
+    selectContact(resolveHintedContact(customer));
+    refreshExistingOrderState();
     evaluateCustomerUnlock(customer, { phoneVerified: false });
     if (!state.awaitingCustomerUnlock) {
       seedCartFromPrevious(customer);
@@ -468,6 +898,14 @@
     state.orderMode = "returning";
     state.isNewCustomer = false;
     state.customer = customer;
+    applyComputedDeliveryDate(customer);
+    applyPreferredCategoryScope(customer);
+    const phoneHint = opts && opts.phone ? opts.phone : "";
+    selectContact(
+      (phoneHint && findContactByPhone(customer, phoneHint)) ||
+        resolveHintedContact(customer)
+    );
+    refreshExistingOrderState();
     evaluateCustomerUnlock(customer, opts || { phoneVerified: true });
     if (!state.awaitingCustomerUnlock) {
       seedCartFromPrevious(customer);
@@ -505,10 +943,15 @@
     state.customer.phone = state.contact.phone.trim();
     state.customer.email = state.contact.email.trim();
     state.customer.dayOfWeek = state.contact.deliveryDay.trim();
+    state.customer.frequency = state.contact.frequency.trim();
+    state.customer.frequencyNote = isOtherFrequency(state.contact.frequency)
+      ? state.contact.frequencyNote.trim()
+      : "";
     state.customer.address = state.contact.address.trim();
     const lang = normalizeLang(state.contact.language) || "en";
     state.customer.preferredLanguage = lang;
     state.customer.language = lang;
+    applyComputedDeliveryDate(state.customer, { force: true });
   }
 
   function readContactFields() {
@@ -517,6 +960,8 @@
       phone: (els.contactPhone?.value || "").trim(),
       email: (els.contactEmail?.value || "").trim(),
       deliveryDay: (els.contactDeliveryDay?.value || "").trim(),
+      frequency: (els.contactFrequency?.value || "").trim(),
+      frequencyNote: (els.contactFrequencyOther?.value || "").trim(),
       address: (els.contactAddress?.value || "").trim(),
       language:
         normalizeLang(els.contactLanguage?.value) ||
@@ -532,11 +977,16 @@
     if (els.contactEmail) els.contactEmail.value = state.contact.email || "";
     if (els.contactDeliveryDay)
       els.contactDeliveryDay.value = state.contact.deliveryDay || "";
+    if (els.contactFrequency)
+      els.contactFrequency.value = state.contact.frequency || "";
+    if (els.contactFrequencyOther)
+      els.contactFrequencyOther.value = state.contact.frequencyNote || "";
     if (els.contactAddress)
       els.contactAddress.value = state.contact.address || "";
     if (els.contactLanguage)
       els.contactLanguage.value =
         normalizeLang(state.contact.language) || "en";
+    syncFrequencyOtherField();
   }
 
   function validateNewCustomerContact() {
@@ -557,6 +1007,9 @@
     } else if (els.contactEmail) {
       els.contactEmail.classList.remove("invalid");
     }
+    const other = isOtherFrequency(state.contact.frequency);
+    syncFrequencyOtherField();
+    mark(els.contactFrequencyOther, other && !state.contact.frequencyNote);
     return ok;
   }
 
@@ -702,6 +1155,9 @@
       "browseList",
       "browseCount",
       "browseSub",
+      "browseScopeBar",
+      "browseScopeCopy",
+      "browseAllBtn",
       "browseToolbar",
       "browseToolbarLabel",
       "addCategoryAllBtn",
@@ -725,6 +1181,9 @@
       "contactPhone",
       "contactEmail",
       "contactDeliveryDay",
+      "contactFrequency",
+      "contactFrequencyOther",
+      "contactFrequencyOtherField",
       "contactLanguage",
       "contactAddress",
       "startNewBtn",
@@ -757,6 +1216,11 @@
       "adminCustomerPhone",
       "adminUnlockCustomerBtn",
       "adminPhoneHint",
+      "orderContactSection",
+      "orderContactSelect",
+      "alreadyOrderedSection",
+      "alreadyOrderedHeading",
+      "alreadyOrderedBody",
     ].forEach((id) => {
       els[id] = document.getElementById(id);
     });
@@ -811,6 +1275,7 @@
     const unlocked = orderUiUnlocked();
     const needsCustomerUnlock =
       !isAdmin && state.awaitingCustomerUnlock && Boolean(state.customer);
+    const orderLocked = Boolean(state.existingOrder);
     const showOrderChrome = unlocked && !needsCustomerUnlock;
 
     show(els.customerUnlockSection, needsCustomerUnlock);
@@ -831,12 +1296,38 @@
 
     document
       .querySelector(".summary-bar")
-      ?.classList.toggle("hidden", !showOrderChrome);
+      ?.classList.toggle("hidden", !showOrderChrome || orderLocked);
 
     // Order body: cart / browse / notes / cutoff (marked data-order-body in HTML, or class)
     document.querySelectorAll("[data-order-body]").forEach((el) => {
-      show(el, showOrderChrome);
+      show(el, showOrderChrome && !orderLocked);
     });
+
+    const contacts = customerContacts(state.customer);
+    const showContactPicker =
+      showOrderChrome &&
+      !orderLocked &&
+      !isNew &&
+      contacts.length > 1;
+    show(els.orderContactSection, showContactPicker);
+    if (showContactPicker) renderOrderContactSelect();
+
+    show(els.alreadyOrderedSection, showOrderChrome && orderLocked);
+    if (showOrderChrome && orderLocked && els.alreadyOrderedBody) {
+      const dateLabel =
+        formatDate(state.customer?.nextDeliveryDate) !== "—"
+          ? formatDate(state.customer.nextDeliveryDate)
+          : weekdayLabel(state.customer?.dayOfWeek) ||
+            t("decline.period_fallback");
+      const declined = Boolean(
+        state.existingOrder.declined ||
+          String(state.existingOrder.status || "").toLowerCase() ===
+            "declined"
+      );
+      els.alreadyOrderedBody.textContent = declined
+        ? t("already.body_declined", { date: dateLabel })
+        : t("already.body", { date: dateLabel });
+    }
 
     show(els.contactSection, isNew && !isAdmin);
     // Allow leaving accidental "new customer" path
@@ -854,6 +1345,7 @@
       Boolean(state.customer) &&
       !isNew &&
       showOrderChrome &&
+      !orderLocked &&
       (state.orderMode === "returning" || state.orderMode === "admin" || isAdmin);
     show(els.declineSection, canDeclinePeriod);
     show(els.declineFooter, canDeclinePeriod);
@@ -871,7 +1363,10 @@
     if (els.headerBadge) {
       if (isAdmin) els.headerBadge.textContent = t("header.badge_admin");
       else if (isNew) els.headerBadge.textContent = t("header.badge_new");
-      else els.headerBadge.textContent = t("header.badge_weekly");
+      else
+        els.headerBadge.textContent = t(
+          frequencyBadgeKey(state.customer?.frequency)
+        );
     }
 
     if (els.heroKicker) {
@@ -907,11 +1402,17 @@
       const displayName =
         state.contact.name || state.customer?.name || t("hero.new_customer");
       if (els.customerName) els.customerName.textContent = displayName;
-      if (els.deliveryPill) {
-        const day = state.contact.deliveryDay
-          ? weekdayLabel(state.contact.deliveryDay)
-          : t("hero.tbd");
-        if (els.deliveryDate) els.deliveryDate.textContent = day;
+      if (els.deliveryDate) {
+        const computed = state.customer?.nextDeliveryDate;
+        if (computed && formatDate(computed) !== "—") {
+          els.deliveryDate.textContent = formatDate(computed);
+        } else if (state.contact.deliveryDay) {
+          els.deliveryDate.textContent = weekdayLabel(
+            state.contact.deliveryDay
+          );
+        } else {
+          els.deliveryDate.textContent = t("hero.tbd");
+        }
       }
       if (els.cutoffNotice) {
         els.cutoffNotice.innerHTML = `
@@ -921,6 +1422,16 @@
       }
     } else if (state.customer) {
       if (els.customerName) els.customerName.textContent = state.customer.name;
+      if (
+        els.heroSubtitle &&
+        state.selectedContact &&
+        state.selectedContact.contactName &&
+        !isAdmin
+      ) {
+        els.heroSubtitle.textContent = t("order_contact.as", {
+          name: state.selectedContact.contactName,
+        });
+      }
       if (els.deliveryDate) {
         const label =
           formatDate(state.customer.nextDeliveryDate) !== "—"
@@ -944,6 +1455,40 @@
     }
 
     // Staff Picks visibility is handled in renderPromo()
+  }
+
+  function renderOrderContactSelect() {
+    if (!els.orderContactSelect) return;
+    const list = customerContacts(state.customer);
+    const selectedKey = contactKey(state.selectedContact);
+    els.orderContactSelect.innerHTML = list
+      .map((ct) => {
+        const key = contactKey(ct);
+        const name = ct.contactName || t("order_contact.unnamed");
+        const phone = ct.phone ? ` · ${ct.phone}` : "";
+        const primary = ct.isPrimary
+          ? ` (${t("order_contact.primary")})`
+          : "";
+        return `<option value="${escapeAttr(key)}">${escapeHtml(
+          name + phone + primary
+        )}</option>`;
+      })
+      .join("");
+    if (selectedKey) els.orderContactSelect.value = selectedKey;
+    if (els.orderContactSelect.dataset.bound === "1") return;
+    els.orderContactSelect.dataset.bound = "1";
+    els.orderContactSelect.addEventListener("change", () => {
+      const key = els.orderContactSelect.value;
+      const match =
+        customerContacts(state.customer).find((ct) => contactKey(ct) === key) ||
+        null;
+      selectContact(match);
+      if (els.heroSubtitle && match && match.contactName && !isAdmin) {
+        els.heroSubtitle.textContent = t("order_contact.as", {
+          name: match.contactName,
+        });
+      }
+    });
   }
 
   function renderAdminSelect() {
@@ -976,6 +1521,17 @@
       if (els.adminPhoneHint) {
         els.adminPhoneHint.textContent = "";
         els.adminPhoneHint.className = "landing-hint";
+      }
+
+      if (state.customer) {
+        applyComputedDeliveryDate(state.customer);
+        applyPreferredCategoryScope(state.customer);
+        selectContact(primaryContact(state.customer));
+        refreshExistingOrderState();
+      } else {
+        selectContact(null);
+        state.existingOrder = null;
+        applyPreferredCategoryScope(null);
       }
 
       if (!state.customer) {
@@ -1073,7 +1629,7 @@
   }
 
   function staffPickProducts() {
-    return state.products.filter(
+    return scopedProducts().filter(
       (p) => p && p.staffPick && p.active !== false && (p.name || p.sku)
     );
   }
@@ -1129,8 +1685,11 @@
    * Frozen Fruit Pulps first, Dry Food last, everything else between.
    */
   function categories() {
+    const source = hasPreferredFilter()
+      ? scopedProducts()
+      : state.products;
     const present = new Set(
-      state.products.map(
+      source.map(
         (p) => String(p.category || "General").trim() || "General"
       )
     );
@@ -1246,19 +1805,18 @@
 
   /**
    * Browse list filter:
-   * - With search text → ALWAYS full catalog (category chip ignored)
-   * - Without search → selected category only (or All)
+   * - Preferred categories (unless Browse all) narrow the catalog first
+   * - With search text → search within that catalog (chip ignored)
+   * - Without search → selected category only (or All in scope)
    */
   function filteredProducts() {
-    const catalog = state.products.filter((p) => p && (p.name || p.sku));
+    const catalog = scopedProducts().filter((p) => p && (p.name || p.sku));
 
-    // Typing in search box = global catalog search
     if (isSearching()) {
       const q = state.search.trim();
       return catalog.filter((p) => productMatchesSearch(p, q));
     }
 
-    // No search: category browse
     if (state.category && state.category !== "All") {
       return catalog.filter(
         (p) => String(p.category || "General").trim() === state.category
@@ -1268,15 +1826,17 @@
   }
 
   function productsInCategory(category) {
-    if (!category || category === "All") return state.products.slice();
-    return state.products.filter(
+    const catalog = scopedProducts();
+    if (!category || category === "All") return catalog.slice();
+    return catalog.filter(
       (p) => String(p.category || "General").trim() === category
     );
   }
 
   function categoryChipHtml(c) {
+    const scoped = scopedProducts();
     const count =
-      c === "All" ? state.products.length : productsInCategory(c).length;
+      c === "All" ? scoped.length : productsInCategory(c).length;
     const label = categoryChipLabel(c);
     const fullLabel = catLabel(c);
     return `<button type="button" class="chip ${
@@ -1335,6 +1895,46 @@
       <div class="category-row category-row-other" role="presentation">
         ${row2.map(categoryChipHtml).join("")}
       </div>`;
+    syncBrowseScopeUi();
+  }
+
+  function syncBrowseScopeUi() {
+    const hasPrefs = state.preferredCategories.length > 0;
+    const filtered = hasPreferredFilter();
+    show(els.browseScopeBar, hasPrefs && !state.isNewCustomer);
+    if (els.browseAllBtn) {
+      els.browseAllBtn.textContent = filtered
+        ? t("browse.add_other")
+        : t("browse.preferred_only");
+    }
+    if (els.browseScopeCopy) {
+      els.browseScopeCopy.textContent = filtered
+        ? t("browse.scope_preferred")
+        : hasPrefs
+          ? t("browse.scope_all")
+          : "";
+    }
+    if (els.browseSub) {
+      if (filtered) {
+        els.browseSub.innerHTML = t("browse.sub_preferred");
+      } else if (I18n && typeof I18n.t === "function") {
+        els.browseSub.innerHTML = t("browse.sub");
+      }
+    }
+    const searchLabel = els.searchInput
+      ? document.querySelector('label[for="searchInput"]')
+      : null;
+    if (searchLabel) {
+      searchLabel.textContent = filtered
+        ? t("browse.search_label_preferred")
+        : t("browse.search_label");
+    }
+    if (els.searchInput) {
+      els.searchInput.setAttribute(
+        "placeholder",
+        filtered ? t("browse.search_ph_preferred") : t("browse.search_ph")
+      );
+    }
   }
 
   function renderBrowseToolbar(list) {
@@ -1359,20 +1959,33 @@
     const list = filteredProducts();
     const searching = isSearching();
 
-    // Hint: search always spans all products
+    syncBrowseScopeUi();
+
     if (els.searchScopeHint) {
-      show(
-        els.searchScopeHint,
-        searching && state.category && state.category !== "All"
-      );
+      if (searching && hasPreferredFilter()) {
+        els.searchScopeHint.innerHTML = t("browse.scope_hint_preferred");
+        show(els.searchScopeHint, true);
+      } else {
+        if (I18n && typeof I18n.t === "function") {
+          els.searchScopeHint.innerHTML = t("browse.scope_hint");
+        }
+        show(
+          els.searchScopeHint,
+          searching && state.category && state.category !== "All"
+        );
+      }
     }
 
     if (els.browseCount) {
       if (searching) {
         els.browseCount.textContent = tn(
           list.length,
-          "browse.matches_one",
-          "browse.matches_many",
+          hasPreferredFilter()
+            ? "browse.matches_pref_one"
+            : "browse.matches_one",
+          hasPreferredFilter()
+            ? "browse.matches_pref_many"
+            : "browse.matches_many",
           { n: list.length }
         );
       } else if (state.category === "All") {
@@ -1415,7 +2028,11 @@
                   })
                 )
           }
-          <p class="browse-empty-hint">${t("browse.empty_tip")}</p>
+          <p class="browse-empty-hint">${
+            hasPreferredFilter()
+              ? t("browse.empty_tip_preferred")
+              : t("browse.empty_tip")
+          }</p>
         </div>`;
       return;
     }
@@ -1512,7 +2129,10 @@
         orderUiUnlocked() &&
         (state.customer || (isAdmin && state.customer) || state.isNewCustomer);
       els.submitBtn.disabled =
-        state.submitting || !sessionOk || lines.length === 0;
+        state.submitting ||
+        !sessionOk ||
+        Boolean(state.existingOrder) ||
+        lines.length === 0;
       els.submitBtn.textContent = state.submitting
         ? t("summary.submitting")
         : state.isNewCustomer
@@ -1626,6 +2246,8 @@
     els.adminLogoutBtn?.addEventListener("click", () => {
       if (Auth && Auth.logoutAdmin) Auth.logoutAdmin();
       state.customer = null;
+      state.selectedContact = null;
+      state.existingOrder = null;
       state.cart.clear();
       state.adminCustomerLocked = false;
       if (els.adminSelect) els.adminSelect.value = "";
@@ -1747,7 +2369,7 @@
         });
         els.lookupHint.className = "landing-hint ok";
       }
-      startReturningCustomer(match, { phoneVerified: true });
+      startReturningCustomer(match, { phoneVerified: true, phone });
       enterOrderUI();
     });
 
@@ -1758,25 +2380,41 @@
       }
     });
 
-    // Live-update new-customer header name
-    ["contactName", "contactPhone", "contactEmail", "contactDeliveryDay", "contactAddress"].forEach(
-      (id) => {
-        els[id]?.addEventListener("input", () => {
-          if (!state.isNewCustomer) return;
-          readContactFields();
-          if (els.customerName) {
-            els.customerName.textContent =
-              state.contact.name || t("hero.new_customer");
-          }
-          if (els.deliveryDate && state.contact.deliveryDay) {
-            els.deliveryDate.textContent = weekdayLabel(
-              state.contact.deliveryDay
-            );
-          }
-          updateSummary();
-        });
+    // Live-update new-customer header name / next delivery
+    const onContactFieldChange = () => {
+      if (!state.isNewCustomer) return;
+      readContactFields();
+      syncFrequencyOtherField();
+      if (els.customerName) {
+        els.customerName.textContent =
+          state.contact.name || t("hero.new_customer");
       }
-    );
+      if (els.deliveryDate) {
+        const computed = state.customer?.nextDeliveryDate;
+        if (computed && formatDate(computed) !== "—") {
+          els.deliveryDate.textContent = formatDate(computed);
+        } else if (state.contact.deliveryDay) {
+          els.deliveryDate.textContent = weekdayLabel(
+            state.contact.deliveryDay
+          );
+        } else {
+          els.deliveryDate.textContent = t("hero.tbd");
+        }
+      }
+      updateSummary();
+    };
+    [
+      "contactName",
+      "contactPhone",
+      "contactEmail",
+      "contactDeliveryDay",
+      "contactFrequency",
+      "contactFrequencyOther",
+      "contactAddress",
+    ].forEach((id) => {
+      els[id]?.addEventListener("input", onContactFieldChange);
+      els[id]?.addEventListener("change", onContactFieldChange);
+    });
 
     // New customers only: one-time preferred language → switches entire UI
     els.contactLanguage?.addEventListener("change", () => {
@@ -1844,6 +2482,21 @@
       toast(t("toast.added"));
     });
 
+    els.browseAllBtn?.addEventListener("click", () => {
+      if (!state.preferredCategories.length) return;
+      state.browseAll = !state.browseAll;
+      if (
+        !state.browseAll &&
+        state.category !== "All" &&
+        state.preferredCategories.indexOf(state.category) === -1
+      ) {
+        state.category = "All";
+      }
+      renderCategoryTabs();
+      renderBrowse();
+      renderPromo();
+    });
+
     els.categoryTabs?.addEventListener("click", (e) => {
       const chip = closest(e, "[data-category]");
       if (!chip) return;
@@ -1858,7 +2511,7 @@
     });
 
     const onSearch = (e) => {
-      // Always search the full catalog; do not narrow by selected category
+      // Search the current catalog scope (preferred categories unless Browse all)
       state.search = (e.target && e.target.value) || "";
       renderBrowse();
       renderBrowseToolbar(filteredProducts());
@@ -1895,6 +2548,10 @@
         toast(
           isAdmin ? t("toast.select_customer") : t("toast.open_link_first")
         );
+        return;
+      }
+      if (state.existingOrder) {
+        toast(t("already.toast"));
         return;
       }
       const period =
@@ -1960,11 +2617,28 @@
         name: customerName,
         phone: isNew
           ? state.contact.phone
-          : state.customer?.phone || "",
+          : state.selectedContact?.phone || state.customer?.phone || "",
         email: isNew
           ? state.contact.email
-          : state.customer?.email || "",
-        frequency: state.customer?.frequency || "",
+          : state.selectedContact?.email || state.customer?.email || "",
+        contact: isNew
+          ? null
+          : state.selectedContact
+            ? {
+                name: state.selectedContact.contactName || "",
+                phone: state.selectedContact.phone || "",
+                email: state.selectedContact.email || "",
+                isPrimary: Boolean(state.selectedContact.isPrimary),
+              }
+            : null,
+        frequency: isNew
+          ? state.contact.frequency
+          : state.customer?.frequency || "",
+        frequencyNote: isNew
+          ? isOtherFrequency(state.contact.frequency)
+            ? state.contact.frequencyNote
+            : ""
+          : state.customer?.frequencyNote || "",
         dayOfWeek: isNew
           ? state.contact.deliveryDay
           : state.customer?.dayOfWeek || "",
@@ -1979,6 +2653,9 @@
             (I18n && typeof I18n.getLang === "function"
               ? I18n.getLang()
               : "en"),
+        preferredCategories: isNew
+          ? []
+          : (state.preferredCategories || []).slice(),
         isNew,
       },
       delivery: {
@@ -1986,6 +2663,17 @@
         preferredDay: isNew
           ? state.contact.deliveryDay
           : state.customer?.dayOfWeek || "",
+        frequency: isNew
+          ? state.contact.frequency
+          : state.customer?.frequency || "",
+        frequencyNote: isNew
+          ? isOtherFrequency(state.contact.frequency)
+            ? state.contact.frequencyNote
+            : ""
+          : state.customer?.frequencyNote || "",
+        intervalDays: frequencyIntervalDays(
+          isNew ? state.contact.frequency : state.customer?.frequency || ""
+        ),
         cutoffNote: "5:00 PM day before delivery",
         /** Period identifier Make uses to stop reminders / match Orders log */
         orderPeriodKey:
@@ -1997,11 +2685,17 @@
               ""
           ),
       },
-      notes: declined
-        ? [state.notes, "DECLINED: no order this delivery period"]
-            .filter(Boolean)
-            .join(" · ")
-        : state.notes || "",
+      notes: [
+        declined ? "DECLINED: no order this delivery period" : "",
+        state.notes || "",
+        isNew &&
+        isOtherFrequency(state.contact.frequency) &&
+        state.contact.frequencyNote
+          ? `Frequency (Other): ${state.contact.frequencyNote}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
       order: {
         lineCount: lines.length,
         subtotal: Number((declined ? 0 : cartTotal()).toFixed(2)),
@@ -2028,6 +2722,14 @@
               Notes: [
                 state.contact.deliveryDay
                   ? `Preferred delivery day: ${state.contact.deliveryDay}`
+                  : "",
+                state.contact.frequency
+                  ? `Order frequency: ${
+                      isOtherFrequency(state.contact.frequency) &&
+                      state.contact.frequencyNote
+                        ? `Other — ${state.contact.frequencyNote}`
+                        : state.contact.frequency
+                    }`
                   : "",
                 state.contact.language
                   ? `Preferred language: ${
@@ -2095,7 +2797,10 @@
         (data && (data.error || data.message)) ||
         text.slice(0, 300) ||
         `HTTP ${res.status}`;
-      throw new Error(msg);
+      const err = new Error(msg);
+      err.status = res.status;
+      err.data = data;
+      throw err;
     }
     return data;
   }
@@ -2122,8 +2827,20 @@
       return;
     }
     if (state.isNewCustomer && !declined && !validateNewCustomerContact()) {
-      toast(t("toast.need_contact"));
-      els.contactSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+      toast(
+        isOtherFrequency(state.contact.frequency) && !state.contact.frequencyNote
+          ? t("toast.need_frequency_other")
+          : t("toast.need_contact")
+      );
+      const focusEl =
+        isOtherFrequency(state.contact.frequency) && !state.contact.frequencyNote
+          ? els.contactFrequencyOther
+          : els.contactName;
+      (focusEl || els.contactSection)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      focusEl?.focus();
       return;
     }
     if (!state.isNewCustomer && !state.customer) {
@@ -2138,6 +2855,19 @@
     if (declined && !state.customer && !isAdmin) {
       toast(t("toast.open_to_skip"));
       return;
+    }
+    if (!state.isNewCustomer && state.customer) {
+      await reloadOrderLog();
+      if (refreshExistingOrderState()) {
+        state.submitting = false;
+        enterOrderUI();
+        toast(t("already.toast"));
+        els.alreadyOrderedSection?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+        return;
+      }
     }
     if (state.submitting) return;
 
@@ -2171,6 +2901,22 @@
         throw new Error(
           "Make.com webhook is not configured. Set makeWebhookUrl in js/config.js (see make/order-processing.md)."
         );
+      }
+
+      if (
+        submitResult &&
+        (submitResult.duplicate ||
+          submitResult.duplicateOrder ||
+          String(submitResult.code || submitResult.error || "")
+            .toLowerCase()
+            .includes("duplicate"))
+      ) {
+        const err = new Error(
+          submitResult.message || submitResult.error || t("already.toast")
+        );
+        err.status = 409;
+        err.data = submitResult;
+        throw err;
       }
 
       state.submitted = true;
@@ -2216,6 +2962,23 @@
     } catch (err) {
       console.error(err);
       state.submitting = false;
+      if (isDuplicateSubmitError(err)) {
+        if (!state.existingOrder) {
+          state.existingOrder = {
+            qboCustomerId: state.customer?.qboCustomerId || "",
+            deliveryDate: state.customer?.nextDeliveryDate || "",
+            status: "submitted",
+            declined: Boolean(declined),
+          };
+        }
+        enterOrderUI();
+        toast(t("already.toast"));
+        els.alreadyOrderedSection?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+        return;
+      }
       updateSummary();
       show(els.errorScreen, true);
       show(els.main, false);
@@ -2240,6 +3003,10 @@
     },
     resetToLanding: () => resetToLanding({ openReturning: false }),
     switchToReturning: () => switchToReturningLookup(),
+    computeNextDeliveryDate,
+    frequencyIntervalDays,
+    findExistingOrder,
+    hasPreferredFilter,
   };
 
   function escapeHtml(s) {

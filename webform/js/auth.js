@@ -168,6 +168,19 @@
     return Boolean(normalizePin(customer && (customer.pin || customer.password || customer.accessPin)));
   }
 
+  function customerPhones(customer) {
+    const list = [];
+    if (customer && customer.phone) list.push(customer.phone);
+    (customer && customer.contacts ? customer.contacts : []).forEach((ct) => {
+      if (ct && ct.phone) list.push(ct.phone);
+    });
+    return list;
+  }
+
+  function customerPhoneMatches(customer, phone) {
+    return customerPhones(customer).some((p) => phonesMatch(p, phone));
+  }
+
   /**
    * Whether this returning customer must pass a verify step before ordering.
    */
@@ -201,7 +214,7 @@
     const phoneRequired = Boolean(c.requirePhoneConfirm) || pinRequired;
 
     if (phoneRequired) {
-      if (!phonesMatch(phone, customer.phone)) {
+      if (!customerPhoneMatches(customer, phone)) {
         return { ok: false, error: "phone" };
       }
     }
@@ -227,11 +240,11 @@
       unlockCustomer(id, { method: "admin-open" });
       return { ok: true };
     }
-    if (!customer.phone) {
+    if (!customerPhones(customer).length) {
       // No phone on file — allow with warning code (caller may still unlock)
       return { ok: false, error: "no_phone_on_file" };
     }
-    if (!phonesMatch(phone, customer.phone)) {
+    if (!customerPhoneMatches(customer, phone)) {
       return { ok: false, error: "phone" };
     }
     const id = customer.qboCustomerId || customer.id;
@@ -254,5 +267,7 @@
     verifyAdminCustomerPhone,
     phonesMatch,
     normalizePhone,
+    customerPhones,
+    customerPhoneMatches,
   };
 })(window);

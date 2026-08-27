@@ -68,7 +68,9 @@ Each line needs a real QBO Item Id in `qboItemId`:
 
 ## Customer ID sync
 
-Personalized SMS links use `?customerId=<QBO Customer Id>`.
+Personalized SMS links use `?customerId=<QBO Customer Id>&contact=…&contactPhone=…`.
+
+The submitting person is `customer.contact` (name/phone/email). Invoice CustomerRef stays the **business** QBO id.
 
 New customers: Order API creates a QBO Customer (or reuses DisplayName match), then invoices.
 

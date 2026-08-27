@@ -15,16 +15,19 @@ Configured in `webform/js/config.js` → `googleSheets.spreadsheetId`:
 | Tab | Form reads? | Make writes? | Purpose |
 |-----|-------------|--------------|---------|
 | **Products** | Yes | Optional sync | Catalog |
-| **Clients** | Yes | Yes (new customers) | Accounts, SMS, admin |
+| **Clients** | Yes | Yes (new customers) | Accounts, cadence, admin |
+| **Contacts** | Yes | Yes (new customers) | People at a business (phone/SMS) |
 | **Previous** | Yes | Yes (after order) | Pre-filled cart |
 | **Notes** | No | Yes | Free-text order notes |
-| **Orders** | No | Yes | One row per submission |
+| **Orders** | Yes (duplicate check) | Yes | One row per submission |
 | **Order Lines** | No | Yes | One row per line item |
 | **Delivery Reports** | No | Yes | Driver pull lists |
 
 Share **Anyone with the link → Viewer** for browser CSV access (or use API key).
 
-Add **Orders** and **Order Lines** tabs to the live workbook by importing the templates (headers row only is fine).
+Add **Contacts**, **Orders**, and **Order Lines** tabs to the live workbook by importing the templates (headers row only is fine).
+
+**Duplicate orders:** the form (and Make) treat the first row for a given `quickbooks_id` + `delivery_date` as the winner. Later submissions for that pair are rejected. Status `error` does not count as a winning submission.
 
 ---
 
@@ -57,13 +60,14 @@ Template: not required (sheet already exists). See Products section in googleshe
 |--------|----------|--------|
 | quickbooks_id | Yes | QBO Customer Id; SMS `customerId=` |
 | customer_name | Yes | |
-| phone_number | Recommended | SMS + form lookup |
+| phone_number | Recommended | Fallback if Contacts has no rows; lookup also uses Contacts phones |
 | email | No | |
 | delivery_day | No | e.g. Wednesday |
-| frequency | No | Weekly, etc. |
-| next_delivery_date | No | `YYYY-MM-DD` |
+| frequency | No | Weekly, Bi-Weekly, Every 3 weeks, Monthly, Twice Weekly, Other |
+| next_delivery_date | No | `YYYY-MM-DD` — form computes from day + cadence when blank (see below) |
 | last_order_date | No | |
 | preferred_language | Recommended | `en` or `es` — form UI language for this customer. Also pass as SMS `?lang=` |
+| preferred_categories | No | Multi-select of Products categories. Comma-separated (Sheets “Allow multiple selections”). Empty = show full catalog |
 | pin / access_pin | Optional | Customer order PIN. When set, form requires PIN (and phone) before cart unlocks |
 | active | No | |
 | notes | No | |
@@ -72,7 +76,63 @@ Template: [`Clients.csv`](../integrations/googlesheets/templates/Clients.csv)
 
 **Language:** Returning customers see only their preferred language (no toggle). New customers choose once on the form; Make should write that value back to `preferred_language` when creating the Clients row.
 
-**Access:** Admin page uses owner username/password (`webform/js/config.js` → `auth.admin`) plus customer phone confirmation. Customer PIN is optional per account. Browser checks deter casual misuse only — put `admin.html` behind host auth in production.
+**Access:** Admin page uses owner username/password (`webform/js/config.js` → `auth.admin`) plus a Contacts (or Clients) phone confirmation. Customer PIN is optional per account. Browser checks deter casual misuse only — put `admin.html` behind host auth in production.
+
+### Frequency / next delivery
+
+Stored `frequency` values the form understands:
+
+| Value | Interval (days) | Notes |
+|-------|-----------------|--------|
+| Weekly | 7 | Default if blank |
+| Bi-Weekly | 14 | Label: Every 2 weeks |
+| Every 3 weeks | 21 | Same weekday, three weeks later |
+| Monthly | 28 | Four-week cadence |
+| Twice Weekly | 3 | Next weekday still used for first order |
+| Other | 7 | Custom; **`frequencyNote` required** on the form |
+
+Recurring next date = last order + interval, aligned to preferred weekday, skipping the 5:00 PM cutoff window. First order (no last order) = next preferred weekday (cutoff skip is +7, not a full 3-week jump).
+
+When frequency is **Other**, payload `customer.frequencyNote` (and `Frequency (Other): …` in `notes`) is the description. Make should keep `frequency=Other` on Clients and copy the note into Clients `notes`.
+
+### Preferred categories
+
+`preferred_categories` must use the **same names** as Products `category` (e.g. `Frozen Food`, `Dry Food`, `Soda/Drinks`, `Frozen Fruit Pulps 14 Oz`).
+
+Google Sheets setup (true multi-select dropdown):
+
+1. Import [`Categories.csv`](../integrations/googlesheets/templates/Categories.csv) as tab **Categories** (or keep the list in sync with unique Products categories).  
+2. Clients → column **Preferred Categories**.  
+3. Data → Data validation → **Dropdown (from a range)** → `Categories!A2:A` → enable **Allow multiple selections**.
+
+CSV export is comma-separated. The form also accepts semicolons, pipes, or newlines. Unknown names are ignored.
+
+The order form **defaults to those categories only**. **Add other items** reveals the rest of the catalog. Previous-order lines stay in the cart even if they are outside the preferred set.
+
+SMS links do not need to pass categories when the form can read Clients. Optional override: `preferredCategories=` or `categories=` (comma-separated, URL-encoded).
+
+---
+
+## Contacts tab
+
+One row per person at a business. Several contacts may share the same `quickbooks_id`.
+
+Template: [`Contacts.csv`](../integrations/googlesheets/templates/Contacts.csv)
+
+| Column | Required | Notes |
+|--------|----------|--------|
+| quickbooks_id | Yes | Links to Clients / QBO Customer Id |
+| customer_name | Recommended | Business name (display) |
+| contact_name | Yes | Person placing or receiving order SMS |
+| phone | Recommended | Twilio + form lookup. Blank = no SMS for this person |
+| email | No | |
+| is_primary | No | `Yes` / `No` — default selected contact. If none set, first row wins |
+
+If this tab is empty, the form infers a single contact from the Clients phone/email.
+
+SMS distribution iterates **Contacts** (not Clients): every row with a phone gets its own form link (`customerId`, `deliveryDate`, `contact`, `contactPhone`).
+
+Order payload includes `customer.contact` `{ name, phone, email, isPrimary }` for the person who submitted.
 
 ---
 
@@ -89,7 +149,7 @@ One row per line item of the last non-null order.
 | default_quantity | Yes | Pre-filled qty |
 | unit | No | |
 | price | No | History only; form uses Products price |
-| frequency | No | |
+| frequency | No | Echo of Clients cadence when present |
 | day_of_week | No | |
 | active | No | |
 | last_order_date | No | |
@@ -114,8 +174,8 @@ Template: [`Orders.csv`](../integrations/googlesheets/templates/Orders.csv)
 | order_id | string | Make UUID or `ord_{{timestamp}}_{{customer}}` |
 | quickbooks_id | string | From payload; blank if brand-new |
 | customer_name | string | |
-| phone | string | |
-| email | string | |
+| phone | string | Submitting contact phone when known |
+| email | string | Submitting contact email when known |
 | delivery_date | date | `delivery.nextDeliveryDate` |
 | preferred_day | string | |
 | subtotal | number | `0` if declined |
@@ -141,13 +201,15 @@ Template: [`Orders.csv`](../integrations/googlesheets/templates/Orders.csv)
 | `submitted` | Logged without invoice (edge case / manual) |
 | `error` | QBO or critical step failed |
 
-### Reminder guard query (Make)
+### Reminder / duplicate guard query (Make)
 
-Do **not** send more reminders if Orders has a row where:
+Do **not** send more reminders, and **reject** extra form submissions, if Orders has a row where:
 
 - `quickbooks_id` = customer, and  
 - `delivery_date` = upcoming delivery, and  
-- `status` ∈ (`invoiced`, `submitted`, `declined`)
+- `status` ∈ (`received`, `invoiced`, `submitted`, `declined`) — not `error`
+
+First submission wins for that business + delivery date, even if a different contact sends a second form.
 
 ---
 
@@ -223,12 +285,14 @@ Suggested columns (expand as needed):
 
 ## Make write sequence (order webhook)
 
-1. Generate `order_id`.  
-2. Append **Orders** row (`status=received` or `declined`).  
-3. If not declined:  
+1. Search **Orders** for the same `quickbooks_id` + `delivery_date` (status ≠ `error`). If found → reject (`duplicate_order`); do not write.  
+2. Generate `order_id`.  
+3. Append **Orders** row (`status=received` or `declined`).  
+4. If not declined:  
    - Create QBO customer if needed → invoice  
    - Update Orders (`qbo_*`, `status=invoiced` or `error`)  
    - Append **Order Lines**  
    - Replace **Previous** for that customer  
    - Append **Notes** if notes present  
-4. Twilio confirmations (see [sms-copy.md](sms-copy.md)).  
+   - New customer: append **Clients** + **Contacts** (`is_primary=Yes`)  
+5. Twilio confirmations to **`customer.contact.phone`** when set (see [sms-copy.md](sms-copy.md)).  

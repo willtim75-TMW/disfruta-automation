@@ -173,6 +173,54 @@
         </p>
       </section>
 
+      <section
+        class="section already-ordered-section hidden"
+        id="alreadyOrderedSection"
+        aria-labelledby="alreadyOrderedHeading"
+      >
+        <div class="already-ordered-card">
+          <div class="decline-copy">
+            <h3 id="alreadyOrderedHeading" data-i18n="already.heading">
+              Order already submitted
+            </h3>
+            <p id="alreadyOrderedBody" data-i18n="already.body">
+              An order is already in for this delivery. The first submission
+              wins — additional orders from this account are not accepted.
+            </p>
+            <p class="section-sub" data-i18n="already.help">
+              If you need to change it, contact DisFruta.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="section contact-picker-section hidden"
+        id="orderContactSection"
+        aria-labelledby="orderContactHeading"
+      >
+        <div class="section-head">
+          <h3 id="orderContactHeading" data-i18n="order_contact.heading">
+            Who is placing this order?
+          </h3>
+        </div>
+        <p class="section-sub" data-i18n="order_contact.sub">
+          More than one person is listed for this account. Choose who is
+          ordering today.
+        </p>
+        <div class="card contact-card">
+          <div class="field field-full">
+            <label
+              class="field-label"
+              for="orderContactSelect"
+              data-i18n="order_contact.label"
+              >Contact</label
+            >
+            <select id="orderContactSelect"></select>
+          </div>
+        </div>
+      </section>
+
       <!-- Returning customer unlock (phone / PIN) -->
       <section
         class="section auth-section hidden"
@@ -289,6 +337,44 @@
               </select>
             </div>
             <div class="field">
+              <label class="field-label" for="contactFrequency" data-i18n="contact.frequency"
+                >Order frequency</label
+              >
+              <select id="contactFrequency">
+                <option value="" data-i18n-value="contact.freq_select">— Select —</option>
+                <option value="Weekly" data-i18n-value="contact.freq_weekly">Weekly</option>
+                <option value="Bi-Weekly" data-i18n-value="contact.freq_biweekly">
+                  Every 2 weeks
+                </option>
+                <option value="Every 3 weeks" data-i18n-value="contact.freq_3weeks">
+                  Every 3 weeks
+                </option>
+                <option value="Monthly" data-i18n-value="contact.freq_monthly">Monthly</option>
+                <option value="Twice Weekly" data-i18n-value="contact.freq_twice">
+                  Twice weekly
+                </option>
+                <option value="Other" data-i18n-value="contact.freq_other">Other</option>
+              </select>
+            </div>
+            <div class="field field-full hidden" id="contactFrequencyOtherField">
+              <label
+                class="field-label"
+                for="contactFrequencyOther"
+                data-i18n="contact.freq_other_label"
+                >Describe your frequency *</label
+              >
+              <textarea
+                id="contactFrequencyOther"
+                rows="3"
+                maxlength="400"
+                placeholder="e.g. Every other Thursday, skip holiday weeks"
+                data-i18n-placeholder="contact.freq_other_ph"
+              ></textarea>
+              <p class="field-hint" data-i18n="contact.freq_other_hint">
+                Tell us how often you want deliveries so we can set up the right schedule.
+              </p>
+            </div>
+            <div class="field">
               <label class="field-label" for="contactLanguage" data-i18n="contact.language"
                 >Preferred language</label
               >
@@ -381,6 +467,12 @@
           pick a category chip to browse that group. Use
           <strong>Add all</strong> to put every item in a category on your order.
         </p>
+        <div class="browse-scope hidden" id="browseScopeBar">
+          <p class="browse-scope-copy" id="browseScopeCopy"></p>
+          <button type="button" class="btn btn-secondary" id="browseAllBtn">
+            Add other items
+          </button>
+        </div>
         <div class="search-wrap">
           <label class="sr-only" for="searchInput" data-i18n="browse.search_label">Search all products</label>
           <input

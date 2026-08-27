@@ -656,6 +656,33 @@ a {
   -webkit-overflow-scrolling: touch;
 }
 
+.browse-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 0 0 12px;
+}
+
+.browse-scope.hidden {
+  display: none !important;
+}
+
+.browse-scope-copy {
+  margin: 0;
+  flex: 1 1 220px;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.browse-scope .btn {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+
 .browse-toolbar {
   display: flex;
   align-items: center;
@@ -1209,6 +1236,7 @@ a {
 
 .field input,
 .field select,
+.field textarea,
 .landing-panel input {
   width: 100%;
   min-height: var(--touch);
@@ -1218,8 +1246,21 @@ a {
   background: #fff;
 }
 
+.field textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.field-hint {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .field input:focus,
 .field select:focus,
+.field textarea:focus,
 .landing-panel input:focus {
   outline: none;
   border-color: var(--purple);
@@ -1227,8 +1268,29 @@ a {
 }
 
 .field input.invalid,
-.field select.invalid {
+.field select.invalid,
+.field textarea.invalid {
   border-color: #d92d20;
+}
+
+.already-ordered-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  border: 1.5px solid #f0c7a0;
+  background: #fff8f0;
+}
+
+.already-ordered-card h3 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  color: var(--purple-deep);
+}
+
+.already-ordered-card p {
+  margin: 0;
 }
 
 /* Utility */

@@ -1,7 +1,7 @@
 # Twilio SMS copy
 
 Exact message templates for Make.com → Twilio.  
-Placeholders use `{{double_braces}}` — map them from Clients sheet, webhook payload, or Make variables.
+Placeholders use `{{double_braces}}` — map them from **Contacts** (person) + Clients (business), webhook payload, or Make variables. Use `{{contact_name}}` in greetings; fall back to `{{customer_name}}` if the contact name is blank.
 
 **Sender:** DisFruta Twilio number  
 **Tone:** Short, friendly, wholesale-professional. Spanish optional variants can be added later.
@@ -15,8 +15,10 @@ Placeholders use `{{double_braces}}` — map them from Clients sheet, webhook pa
 **Order link** (returning customers):
 
 ```
-{{order_link}} = {{form_base_url}}?customerId={{quickbooks_id}}&deliveryDate={{delivery_date}}&name={{urlencode customer_name}}
+{{order_link}} = {{form_base_url}}?customerId={{quickbooks_id}}&deliveryDate={{delivery_date}}&name={{urlencode customer_name}}&contact={{urlencode contact_name}}&contactPhone={{urlencode phone}}&lang={{lang}}
 ```
+
+Preferred categories are read from Clients; do **not** need to be on the link. Optional: `&preferredCategories={{urlencode preferred_categories}}`.
 
 **New customer / public link** (no id):
 
@@ -29,11 +31,11 @@ Placeholders use `{{double_braces}}` — map them from Clients sheet, webhook pa
 ## 1. Initial order invite
 
 **When:** ~2 days before delivery (Make distribution scenario)  
-**To:** Customer `phone_number`  
-**Stop if:** Already ordered or declined for this `delivery_date`
+**To:** Each **Contacts** row with a phone for that `quickbooks_id`  
+**Stop if:** Already ordered or declined for this `delivery_date` (one order per business)
 
 ```
-DisFruta: Hola {{customer_name}}! Your delivery is {{delivery_day}} ({{delivery_date_short}}). Review or change your order here: {{order_link}}
+DisFruta: Hola {{contact_name}}! Your delivery is {{delivery_day}} ({{delivery_date_short}}). Review or change your order here: {{order_link}}
 
 Reply NO if you don't need a delivery this week. Order by 5pm the day before. ¡Gracias!
 ```
@@ -41,14 +43,14 @@ Reply NO if you don't need a delivery this week. Order by 5pm the day before. ¡
 **Shorter variant (if near 160-char segments matter):**
 
 ```
-DisFruta: Hi {{customer_name}} — delivery {{delivery_date_short}}. Place/update your order: {{order_link}} Reply NO to skip. Cutoff 5pm day before.
+DisFruta: Hi {{contact_name}} — delivery {{delivery_date_short}}. Place/update your order: {{order_link}} Reply NO to skip. Cutoff 5pm day before.
 ```
 
 ---
 
 ## 2. Reminders
 
-Reminders fire only if **no** Orders log row for this customer + delivery_date with `status` in (`invoiced`, `submitted`, `declined`).
+Reminders fire only if **no** Orders log row for this customer + delivery_date with `status` in (`received`, `invoiced`, `submitted`, `declined`). Send each reminder to **every Contacts phone** still waiting (same `{{order_link}}` per person).
 
 ### 2a. Reminder — Day-2 (morning)
 
@@ -56,7 +58,7 @@ Reminders fire only if **no** Orders log row for this customer + delivery_date w
 **Count:** 1st of up to 2 on Day-2
 
 ```
-DisFruta reminder: {{customer_name}}, we still need your order for {{delivery_date_short}}. Order now: {{order_link}} Or reply NO to skip this week.
+DisFruta reminder: {{contact_name}}, we still need your order for {{delivery_date_short}}. Order now: {{order_link}} Or reply NO to skip this week.
 ```
 
 ### 2b. Reminder — Day-2 (afternoon)
@@ -70,7 +72,7 @@ DisFruta: Friendly nudge — order for {{delivery_date_short}} isn't in yet. {{o
 ### 2c. Reminder — Day-1 morning (day before delivery)
 
 ```
-DisFruta: Tomorrow is delivery day for {{customer_name}}. Please submit by 5pm today: {{order_link}} Reply NO to cancel this week's delivery.
+DisFruta: Tomorrow is delivery day for {{contact_name}}. Please submit by 5pm today: {{order_link}} Reply NO to cancel this week's delivery.
 ```
 
 ### 2d. Reminder — Day-1 afternoon
@@ -97,15 +99,23 @@ DisFruta FINAL CALL: 5pm cutoff soon for {{delivery_date_short}}. Submit here: {
 DisFruta: Got it — no delivery this period for {{customer_name}}. We won't send more reminders for {{delivery_date_short}}. Message us anytime if that changes. ¡Gracias!
 ```
 
+### Duplicate (second contact / second submit)
+
+**When:** Make duplicate guard finds an existing Orders row for this `quickbooks_id` + `delivery_date`. Optional; the form already shows **Order already submitted**.
+
+```
+DisFruta: An order is already in for {{customer_name}} ({{delivery_date_short}}). The first submission is the one we'll fulfill. Message us if you need a change.
+```
+
 ---
 
 ## 4. Order confirmation (customer)
 
 **When:** After successful Make path (invoice created or order logged as submitted)  
-**To:** Customer phone from payload / Clients
+**To:** `customer.contact.phone` when set, else Clients phone
 
 ```
-DisFruta: Order received — thanks {{customer_name}}! {{line_count}} item(s), total {{subtotal_formatted}}. Delivery {{delivery_date_short}}.{{invoice_line}} Questions? Just reply to this text.
+DisFruta: Order received — thanks {{contact_name}}! {{line_count}} item(s), total {{subtotal_formatted}}. Delivery {{delivery_date_short}}.{{invoice_line}} Questions? Just reply to this text.
 ```
 
 **Optional invoice fragment** (if QBO doc number available):
@@ -129,7 +139,7 @@ DisFruta: Order received — thanks Mercado Latino Fresh! 3 item(s), total $118.
 **When:** `isNewCustomer: true` and order accepted
 
 ```
-DisFruta: Welcome {{customer_name}}! We received your first order ({{line_count}} item(s), {{subtotal_formatted}}). Our team will confirm delivery details shortly. Reply here anytime. ¡Bienvenido!
+DisFruta: Welcome {{contact_name}}! We received your first order ({{line_count}} item(s), {{subtotal_formatted}}). Our team will confirm delivery details shortly. Reply here anytime. ¡Bienvenido!
 ```
 
 ---
@@ -140,7 +150,7 @@ DisFruta: Welcome {{customer_name}}! We received your first order ({{line_count}
 **To:** Owner cell(s) (Make variable `{{owner_phone}}`, support multiple modules if needed)
 
 ```
-DisFruta NEW ORDER: {{customer_name}} (QBO {{quickbooks_id_or_NEW}}) · {{line_count}} lines · {{subtotal_formatted}} · delivery {{delivery_date_short}} · source {{source}}{{invoice_bit}}
+DisFruta NEW ORDER: {{customer_name}} / {{contact_name}} (QBO {{quickbooks_id_or_NEW}}) · {{line_count}} lines · {{subtotal_formatted}} · delivery {{delivery_date_short}} · source {{source}}{{invoice_bit}}
 {{notes_bit}}
 ```
 
@@ -213,9 +223,10 @@ Do **not** treat free-form messages containing “no” (e.g. “no cilantro”)
 
 | Placeholder | Source |
 |-------------|--------|
-| `customer_name` | Clients or webhook `customer.name` |
+| `customer_name` | Clients or webhook `customer.name` (business) |
+| `contact_name` | Contacts / `customer.contact.name` (person); fall back to `customer_name` |
 | `quickbooks_id` | Clients / `customer.qboCustomerId` |
-| `phone_number` / `from_phone` | Clients or Twilio |
+| `phone_number` / `from_phone` | Contacts phone, Clients, or Twilio |
 | `delivery_date` | `YYYY-MM-DD` |
 | `delivery_date_short` | e.g. `Wed 7/15` (format in Make) |
 | `delivery_day` | Wednesday, etc. |
@@ -227,6 +238,7 @@ Do **not** treat free-form messages containing “no” (e.g. “no cilantro”)
 | `notes` | webhook `notes` |
 | `owner_phone` | Make data store / constant |
 | `form_base_url` | Make constant |
+| `preferred_categories` | Clients column; optional on the URL. Form defaults browse to these Products categories |
 
 ---
 
@@ -238,6 +250,7 @@ Do **not** treat free-form messages containing “no” (e.g. “no cilantro”)
 | Reminders | §2a–2e |
 | Order webhook success | §4 or §5 + §6 |
 | Order declined | §3 + optional §7 |
+| Duplicate order (second submit) | Duplicate snippet after §3 (optional) |
 | Inbound SMS | §8 (and §3 if keyword) |
 | QBO error path | §9 |
 

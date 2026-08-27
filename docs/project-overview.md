@@ -8,7 +8,7 @@ Build an automated ordering system for DisFruta that lets customers place and mo
 
 ```
                     ┌─────────────┐
-   SMS (Twilio) ──► │  Webform    │ ◄── Google Sheets (Products / Clients / Previous)
+   SMS (Twilio) ──► │  Webform    │ ◄── Google Sheets (Products / Clients / Contacts / Previous / Orders)
                     │  webform/   │
                     └──────┬──────┘
                            │ POST order JSON
@@ -31,8 +31,11 @@ Optional: Make HTTP module → `server/` Order API for custom QBO REST logic. Th
 | Feature | Status |
 |---------|--------|
 | Custom mobile order form (`webform/`) | Implemented |
-| Returning customer link (`?customerId=`) + previous order | Implemented |
-| New customer public entry + contact fields | Implemented |
+| Returning customer link (`?customerId=` + contact params) + previous order | Implemented |
+| Multiple contacts per business (Contacts tab + picker) | Implemented |
+| First-submission-wins duplicate lock (`quickbooks_id` + `delivery_date`) | Implemented (form); Make search still required |
+| New customer public entry + frequency (incl. Every 3 weeks / Other) | Implemented |
+| Preferred product categories (Clients multi-select + **Add other items**) | Implemented |
 | Admin order-on-behalf (`admin.html`) | Implemented |
 | Product catalog from Sheets + embedded fallback | Implemented |
 | Category browse + full-catalog search | Implemented |
@@ -54,12 +57,12 @@ Optional: Make HTTP module → `server/` Order API for custom QBO REST logic. Th
 
 ## Current status
 
-- Form UI complete (new / returning / admin)  
-- Live Google Sheet connected for products (with embedded cache)  
-- Make.com order-processing blueprint written  
+- Form UI complete (new / returning / admin), including contact picker and duplicate-order screen  
+- Live Google Sheet connected for products (with embedded cache); form also reads **Contacts** and **Orders**  
+- Make.com order-processing blueprint written (duplicate search + Contacts fan-out still need to be built in Make)  
 - QBO field mapping and optional Order API available  
 - Make scenarios still need to be **built and connected** in the Make UI (webhook URL, QBO OAuth, Twilio)  
-- Clients / Previous sheet rows need real customer data for production personalization  
+- **Contacts** tab should be filled (one row per person); empty tab infers a single contact from Clients  
 - Products need real **QBO Item IDs** for invoice lines  
 
 ## Phase 1 scope
@@ -73,7 +76,7 @@ Optional: Make HTTP module → `server/` Order API for custom QBO REST logic. Th
 
 - [form-flow.md](form-flow.md)  
 - [fillout-form.md](fillout-form.md)  
-- [data-schema.md](data-schema.md) — includes **Orders** / **Order Lines**  
+- [data-schema.md](data-schema.md) — includes **Contacts**, **Orders** / **Order Lines**, frequency cadence  
 - [sms-copy.md](sms-copy.md) — Twilio message templates  
 - [automation-workflows.md](automation-workflows.md)  
 - [limitations.md](limitations.md)  

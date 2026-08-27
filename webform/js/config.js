@@ -4,7 +4,7 @@
  * Make.com is the automation hub (makeWebhookUrl). See make/order-processing.md.
  *
  * Personalization URL (Twilio / Make SMS):
- *   index.html?customerId=24&deliveryDate=2026-07-15&lang=es&token=optional
+ *   index.html?customerId=24&deliveryDate=2026-07-15&contact=Ana%20Ruiz&contactPhone=15551234001&lang=es&preferredCategories=Frozen%20Food,Dry%20Food&token=optional
  *   (lang should match Clients.preferred_language — form has no public toggle)
  * New customer: index.html  or  index.html?new=1  (picks language on form)
  * Admin: admin.html
@@ -66,17 +66,23 @@ window.DISFRUTA_CONFIG = {
     productsSheet: "Products",
     clientsSheet: "Clients",
     previousSheet: "Previous",
+    contactsSheet: "Contacts",
+    ordersSheet: "Orders",
 
     // Tab gids from sheet URLs (#gid=…)
     productsGid: "0",
     previousGid: "457485810",
     clientsGid: "817083110",
+    contactsGid: "",
+    ordersGid: "",
     // Notes: 344020767 · Delivery Reports: 1710529538 (written by Make.com)
 
     // Published CSV overrides (optional)
     productsCsvUrl: "",
     clientsCsvUrl: "",
     previousCsvUrl: "",
+    contactsCsvUrl: "",
+    ordersCsvUrl: "",
   },
 
   // Local JSON fallbacks (demo / offline)
@@ -149,5 +155,5 @@ window.DISFRUTA_CONFIG = {
   },
 
   // Submitted payload version for Make.com routers
-  payloadVersion: "1.1",
+  payloadVersion: "1.4",
 };

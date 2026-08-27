@@ -28,6 +28,11 @@
 
       // Header / chrome
       "header.badge_weekly": "Weekly order",
+      "header.badge_biweekly": "Every 2 weeks",
+      "header.badge_3weeks": "Every 3 weeks",
+      "header.badge_monthly": "Monthly order",
+      "header.badge_twice": "Twice weekly",
+      "header.badge_other": "Custom schedule",
       "header.badge_new": "New customer",
       "header.badge_admin": "Admin",
       "header.lang_label": "Language",
@@ -136,6 +141,18 @@
       "contact.day_thu": "Thursday",
       "contact.day_fri": "Friday",
       "contact.day_sat": "Saturday",
+      "contact.frequency": "Order frequency",
+      "contact.freq_select": "— Select —",
+      "contact.freq_weekly": "Weekly",
+      "contact.freq_biweekly": "Every 2 weeks",
+      "contact.freq_3weeks": "Every 3 weeks",
+      "contact.freq_monthly": "Monthly",
+      "contact.freq_twice": "Twice weekly",
+      "contact.freq_other": "Other",
+      "contact.freq_other_label": "Describe your frequency *",
+      "contact.freq_other_ph": "e.g. Every other Thursday, skip holiday weeks",
+      "contact.freq_other_hint":
+        "Tell us how often you want deliveries so we can set up the right schedule.",
       "contact.language": "Preferred language",
       "contact.lang_en": "English",
       "contact.lang_es": "Español",
@@ -152,6 +169,22 @@
       "notice.new_review":
         "New accounts are reviewed by DisFruta before the first delivery",
       "notice.day_before": "the day before delivery",
+
+      // Contacts / duplicate order
+      "order_contact.heading": "Who is placing this order?",
+      "order_contact.sub":
+        "More than one person is listed for this account. Choose who is ordering today.",
+      "order_contact.label": "Contact",
+      "order_contact.primary": "primary",
+      "order_contact.unnamed": "Contact",
+      "order_contact.as": "Ordering as {name}",
+      "already.heading": "Order already submitted",
+      "already.body":
+        "An order is already in for {date}. The first submission wins — additional orders from this account are not accepted.",
+      "already.body_declined":
+        "This delivery period was already skipped for {date}.",
+      "already.help": "If you need to change it, contact DisFruta.",
+      "already.toast": "An order is already in for this delivery",
 
       // Decline
       "decline.heading": "Don’t need a delivery this period?",
@@ -201,10 +234,24 @@
       "browse.heading": "Add More Items",
       "browse.sub":
         "Search the <strong>full catalog</strong> anytime (all categories), or pick a category chip to browse that group. Use <strong>Add all</strong> to put every item in a category on your order.",
+      "browse.sub_preferred":
+        "Showing <strong>your usual categories</strong>. Search or pick a chip below. Need something else?",
       "browse.search_label": "Search all products",
+      "browse.search_label_preferred": "Search your usual items",
       "browse.search_ph": "Search all products by name, SKU…",
+      "browse.search_ph_preferred": "Search your usual items…",
       "browse.scope_hint":
         "Searching <strong>all products</strong> — category filter is paused while you type.",
+      "browse.scope_hint_preferred":
+        "Searching <strong>your usual categories</strong> — tap Add other items to search everything.",
+      "browse.add_other": "Add other items",
+      "browse.preferred_only": "Show preferred only",
+      "browse.scope_preferred": "Your usual categories.",
+      "browse.scope_all": "Showing the full catalog.",
+      "browse.matches_pref_one": "{n} match (your categories)",
+      "browse.matches_pref_many": "{n} matches (your categories)",
+      "browse.empty_tip_preferred":
+        "Tip: tap <strong>Add other items</strong> to see the rest of the catalog.",
       "browse.add_all": "Add all in category",
       "browse.products_one": "{n} product",
       "browse.products_many": "{n} products",
@@ -275,6 +322,7 @@
       "toast.open_link_first": "Open your order link first",
       "toast.choose_first": "Choose new or returning customer first",
       "toast.need_contact": "Enter your business name and phone number",
+      "toast.need_frequency_other": "Describe your order frequency",
       "toast.open_or_lookup":
         "Open your personalized link or look up your account",
       "toast.need_items":
@@ -306,6 +354,11 @@
       "meta.title_admin": "DisFruta — Entrada de pedidos (admin)",
 
       "header.badge_weekly": "Pedido semanal",
+      "header.badge_biweekly": "Cada 2 semanas",
+      "header.badge_3weeks": "Cada 3 semanas",
+      "header.badge_monthly": "Pedido mensual",
+      "header.badge_twice": "Dos veces por semana",
+      "header.badge_other": "Horario personalizado",
       "header.badge_new": "Cliente nuevo",
       "header.badge_admin": "Admin",
       "header.lang_label": "Idioma",
@@ -411,6 +464,18 @@
       "contact.day_thu": "Jueves",
       "contact.day_fri": "Viernes",
       "contact.day_sat": "Sábado",
+      "contact.frequency": "Frecuencia del pedido",
+      "contact.freq_select": "— Seleccionar —",
+      "contact.freq_weekly": "Semanal",
+      "contact.freq_biweekly": "Cada 2 semanas",
+      "contact.freq_3weeks": "Cada 3 semanas",
+      "contact.freq_monthly": "Mensual",
+      "contact.freq_twice": "Dos veces por semana",
+      "contact.freq_other": "Otra",
+      "contact.freq_other_label": "Describe tu frecuencia *",
+      "contact.freq_other_ph": "p. ej. Cada dos jueves, omitir semanas festivas",
+      "contact.freq_other_hint":
+        "Cuéntanos con qué frecuencia quieres las entregas para armar el horario correcto.",
       "contact.language": "Idioma preferido",
       "contact.lang_en": "English",
       "contact.lang_es": "Español",
@@ -426,6 +491,21 @@
       "notice.new_review":
         "DisFruta revisa las cuentas nuevas antes de la primera entrega",
       "notice.day_before": "el día anterior a la entrega",
+
+      "order_contact.heading": "¿Quién está haciendo este pedido?",
+      "order_contact.sub":
+        "Hay más de una persona en esta cuenta. Elige quién pide hoy.",
+      "order_contact.label": "Contacto",
+      "order_contact.primary": "principal",
+      "order_contact.unnamed": "Contacto",
+      "order_contact.as": "Pedido de {name}",
+      "already.heading": "Pedido ya enviado",
+      "already.body":
+        "Ya hay un pedido para {date}. Gana el primero — no se aceptan pedidos adicionales de esta cuenta.",
+      "already.body_declined":
+        "Este período de entrega ya se omitió para {date}.",
+      "already.help": "Si necesitas cambiarlo, contacta a DisFruta.",
+      "already.toast": "Ya hay un pedido para esta entrega",
 
       "decline.heading": "¿No necesitas entrega en este período?",
       "decline.body":
@@ -473,10 +553,24 @@
       "browse.heading": "Agregar más artículos",
       "browse.sub":
         "Busca en el <strong>catálogo completo</strong> en cualquier momento (todas las categorías), o elige una categoría para explorar ese grupo. Usa <strong>Agregar todos</strong> para poner cada artículo de una categoría en tu pedido.",
+      "browse.sub_preferred":
+        "Mostrando <strong>tus categorías de siempre</strong>. Busca o elige abajo. ¿Necesitas algo más?",
       "browse.search_label": "Buscar todos los productos",
+      "browse.search_label_preferred": "Buscar tus artículos de siempre",
       "browse.search_ph": "Buscar por nombre, SKU…",
+      "browse.search_ph_preferred": "Buscar tus artículos de siempre…",
       "browse.scope_hint":
         "Buscando en <strong>todos los productos</strong> — el filtro de categoría se pausa mientras escribes.",
+      "browse.scope_hint_preferred":
+        "Buscando en <strong>tus categorías de siempre</strong> — toca Agregar otros artículos para buscar todo.",
+      "browse.add_other": "Agregar otros artículos",
+      "browse.preferred_only": "Ver solo lo habitual",
+      "browse.scope_preferred": "Tus categorías de siempre.",
+      "browse.scope_all": "Mostrando el catálogo completo.",
+      "browse.matches_pref_one": "{n} coincidencia (tus categorías)",
+      "browse.matches_pref_many": "{n} coincidencias (tus categorías)",
+      "browse.empty_tip_preferred":
+        "Consejo: toca <strong>Agregar otros artículos</strong> para ver el resto del catálogo.",
       "browse.add_all": "Agregar todos de la categoría",
       "browse.products_one": "{n} producto",
       "browse.products_many": "{n} productos",
@@ -546,6 +640,7 @@
       "toast.open_link_first": "Abre primero el enlace de tu pedido",
       "toast.choose_first": "Elige primero cliente nuevo o existente",
       "toast.need_contact": "Ingresa el nombre del negocio y el teléfono",
+      "toast.need_frequency_other": "Describe tu frecuencia de pedido",
       "toast.open_or_lookup":
         "Abre tu enlace personalizado o busca tu cuenta",
       "toast.need_items":

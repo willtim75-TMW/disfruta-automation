@@ -40,8 +40,9 @@ orderApiUrl: "", // leave empty — Make is the hub
 | Step | Module | Purpose |
 |------|--------|---------|
 | 1 | **Webhooks → Custom webhook** | Receive form JSON (`POST`) |
-| 2 | **Tools → Set variables** | Normalize customer ID, subtotal, declined, isNewCustomer |
-| 3 | **Router** | A: declined · B: new customer · C: returning order |
+| 2 | **Tools → Set variables** | Normalize customer ID, subtotal, declined, isNewCustomer, contact |
+| 3 | **Google Sheets · Search rows** | Duplicate guard: Orders where `quickbooks_id` + `delivery_date` and status ≠ `error` |
+| 4 | **Router** | 0: duplicate · A: declined · B: new customer · C: returning order |
 | 4A | Google Sheets · Add row | Decline log; stop reminders |
 | 5A | Twilio · Send SMS | “No delivery this cycle” |
 | 4B | Google Sheets · Add row(s) | Orders log + line items |
@@ -125,6 +126,22 @@ Customer (or admin) indicated **no delivery needed for this order period**.
 
 Match period using `delivery.nextDeliveryDate` and/or `delivery.orderPeriodKey`.
 
+### Duplicate order (first submission wins)
+
+Search **Orders** for the same `customer.qboCustomerId` + `delivery.nextDeliveryDate` where `status` is not `error`.
+
+If a row exists:
+
+| Step | Action |
+|------|--------|
+| 1 | Do **not** append another Orders row, invoice, or Previous change |
+| 2 | Webhook response `409` (or `200` with `{ "ok": false, "code": "duplicate_order", "message": "An order is already in for this delivery" }`) |
+| 3 | Optional SMS only to the contact who just submitted: already-in message |
+
+The form also reads Orders and blocks the UI, but two contacts can still race — this Make search is the real lock.
+
+When logging a **new** customer, also append a **Contacts** row (`is_primary=Yes`) from `customer.name` / `customer.phone`.
+
 ---
 
 ## Google Sheets writes
@@ -138,6 +155,7 @@ Full column specs + CSV templates: [docs/data-schema.md](../docs/data-schema.md)
 | **Notes** | `Notes.csv` | If `notes` non-empty |
 | **Previous** | replace rows | After successful invoice |
 | **Clients** | append | New customer path |
+| **Contacts** | append | New customer path (primary contact) |
 | **Delivery Reports** | append/rebuild | After order or daily |
 
 ### Orders status
@@ -146,7 +164,9 @@ Full column specs + CSV templates: [docs/data-schema.md](../docs/data-schema.md)
 
 ### Reminder guard
 
-Skip SMS if Orders has matching `quickbooks_id` + `delivery_date` with status `invoiced`, `submitted`, or `declined`.
+Skip SMS if Orders has matching `quickbooks_id` + `delivery_date` with status `received`, `invoiced`, `submitted`, or `declined`.
+
+Daily distribution iterates **Contacts** with a phone for that QBO id. Link includes `contact` + `contactPhone`. See [automation-workflows.md](../docs/automation-workflows.md).
 
 ## Twilio SMS copy
 
@@ -167,12 +187,14 @@ Decline keywords: exact match only (`NO`, `NO ORDER`, `SKIP`, …).
 
 Still owned by Make:
 
-1. Daily: Clients due in ~2 days, no order yet.
-2. Twilio SMS with personalized link:
+1. Daily: Clients due in ~2 days, no winning Orders row yet.
+2. For each **Contacts** row on that QBO id with a phone, Twilio SMS:
 
 ```
-https://YOUR_HOST/webform/index.html?customerId={{qbo_id}}&deliveryDate={{date}}&name={{encode name}}&token={{hmac}}
+https://YOUR_HOST/webform/index.html?customerId={{qbo_id}}&deliveryDate={{date}}&name={{encode customer_name}}&contact={{encode contact_name}}&contactPhone={{encode phone}}&lang={{lang}}&token={{hmac}}
 ```
+
+Preferred categories are loaded from Clients. Optional: `&preferredCategories={{urlencode preferred_categories}}`.
 
 3. Reminder cadence per `docs/automation-workflows.md`.
 
@@ -180,7 +202,7 @@ https://YOUR_HOST/webform/index.html?customerId={{qbo_id}}&deliveryDate={{date}}
 
 ## Payload versioning
 
-Form sends `version` (currently `"1.2"`). Branch in Make if the schema changes.
+Form sends `version` (currently `"1.4"`). Branch in Make if the schema changes.
 
 Key flags Make should switch on:
 
@@ -190,6 +212,11 @@ Key flags Make should switch on:
 | `isNewCustomer` | Create Customer before Invoice |
 | `createQuickBooksInvoice` | `true` unless declined |
 | `source` | `customer-form` / `new-customer-form` / `admin-form` |
+| `customer.contact` | Person placing this order (`name`, `phone`, `email`, `isPrimary`) |
+| `customer.preferredCategories` | Products category names this customer usually orders |
+| `customer.frequency` | Weekly, Bi-Weekly, Every 3 weeks, Monthly, Twice Weekly, Other |
+| `customer.frequencyNote` | Required description when frequency is Other |
+| `delivery.intervalDays` | Cadence in days (21 for Every 3 weeks) |
 | `quickbooks` | Ready-to-map QBO invoice object |
 
 ---

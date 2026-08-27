@@ -20,6 +20,8 @@ Open:
 - Landing / new customer: http://localhost:8080/  
 - New order direct: http://localhost:8080/?new=1  
 - Returning demo: http://localhost:8080/?customerId=24  
+- Returning + contact: http://localhost:8080/?customerId=24&contact=Ana%20Ruiz&contactPhone=15551234001  
+- Already-ordered demo (Orders log): http://localhost:8080/?customerId=24&deliveryDate=2026-07-15  
 - Admin: http://localhost:8080/admin.html  
 - Spanish via SMS-style link: http://localhost:8080/?customerId=24&lang=es  
 
@@ -35,7 +37,7 @@ Configured in `js/config.js` → `auth` (logic in `js/auth.js`).
 
 | Surface | Protection |
 |---------|------------|
-| **Admin** (`admin.html`) | Owner **username + password**, then **customer phone** on file to unlock that account |
+| **Admin** (`admin.html`) | Owner **username + password**, then **any Contacts phone** on file to unlock that account |
 | **Customer** | Optional **phone re-confirm** (`auth.customer.requirePhoneConfirm`) and/or **PIN** from Clients (`pin` / `access_pin`) when `requirePinIfSet` is true |
 
 Demo admin (change before production):
@@ -69,47 +71,61 @@ Products load from `data/products.json` first (91 active items), then refresh fr
 
 ## Form sections (spec)
 
-1. **Header** — logo, customer name, next delivery day, “What would you like this week?”
-2. **Your Previous Order** — name, description, unit, price, qty stepper, line subtotal, remove
-3. **Promotional / Staff Picks** — one-click Add from `staffPick` products
-4. **Add More Items** — search + category browse + qty + Add
-5. **Order Summary** — live total + large Submit · special notes · 5 PM cutoff notice
-6. **Admin page** — QuickBooks customer select to order on behalf of a client
+1. **Header** — logo, customer name, next delivery date, “What would you like this week?” / “Ordering as {contact}”
+2. **Who is placing this order?** — contact picker when a business has multiple **Contacts**
+3. **Already submitted** — blocks cart/submit if Orders already has this QBO id + delivery date
+4. **New-customer details** — name, phone, email, delivery day, **frequency** (incl. Every 3 weeks + Other), language, address
+5. **Your Previous Order** — name, description, unit, price, qty stepper, line subtotal, remove
+6. **Promotional / Staff Picks** — one-click Add from `staffPick` products
+7. **Add More Items** — preferred categories by default; **Add other items** for the full catalog
+8. **Order Summary** — live total + large Submit · special notes · 5 PM cutoff notice
+9. **Admin page** — QuickBooks customer select to order on behalf of a client
 
 ## Entry modes
 
 | Who | How they open the form |
 |-----|------------------------|
 | **New customer** | `index.html` → “I’m a new customer”, or `?new=1` |
-| **Returning (SMS link)** | `?customerId=<QBO_ID>&deliveryDate=…` |
-| **Returning (no link)** | Landing → “I already order” → phone lookup on Clients sheet |
+| **Returning (SMS link)** | `?customerId=<QBO_ID>&deliveryDate=…&contact=…&contactPhone=…` |
+| **Returning (no link)** | Landing → “I already order” → phone lookup on **Contacts** (or Clients) |
 | **Admin** | `admin.html` customer dropdown |
 
-New customers fill business name + phone (required), then build a cart from the live catalog (no previous order). Payload includes `isNewCustomer: true` so Make can create the QBO customer.
+New customers fill business name + phone (required), plus optional delivery day and **order frequency**, then build a cart from the live catalog (no previous order). Payload includes `isNewCustomer: true` so Make can create the QBO customer and a primary **Contacts** row.
 
 ## Personalization (returning)
 
 Make.com / Twilio SMS links:
 
 ```
-https://YOUR_HOST/webform/index.html?customerId=24&deliveryDate=2026-07-15&name=Mercado%20Latino%20Fresh&token=...
+https://YOUR_HOST/webform/index.html?customerId=24&deliveryDate=2026-07-15&name=Mercado%20Latino%20Fresh&contact=Ana%20Ruiz&contactPhone=15551234001&lang=es&token=...
 ```
 
 | Param | Purpose |
 |-------|---------|
+| `preferredCategories` / `categories` | Optional comma-separated Products categories (overrides Clients) |
 | `customerId` / `qboId` | QuickBooks Online customer ID |
-| `deliveryDate` | Next delivery (YYYY-MM-DD), overrides catalog |
-| `name` | Optional display name override |
+| `deliveryDate` | Next delivery (YYYY-MM-DD), overrides computed date |
+| `name` | Optional business display name override |
+| `contact` / `contactName` | Pre-select this Contacts person |
+| `contactPhone` | Pre-select / match by phone |
+| `lang` | `en` / `es` (SMS should match Clients `preferred_language`) |
 | `new=1` | Skip landing; open new-customer flow |
 | `token` | Optional shared secret for Make filters |
 
-## Google Sheets (product catalog)
+## Google Sheets (catalog + accounts)
 
-**Products, Clients, and Previous orders load from Google Sheets** — that is the
-live source of truth for what customers can order and their pre-filled cart.
+**Products, Clients, Contacts, Previous, and Orders** load from Google Sheets.
 
 Configure in `js/config.js` → `googleSheets` (spreadsheet ID + API key, or
 published CSV URLs). Full setup: [`../integrations/googlesheets/README.md`](../integrations/googlesheets/README.md).
+
+| Tab | Form use |
+|-----|----------|
+| Products | Catalog, prices, staff picks |
+| Clients | Business cadence, language, PIN |
+| Contacts | People / SMS / who is ordering |
+| Previous | Pre-filled cart |
+| Orders | Duplicate-order guard (first submit wins) |
 
 Until Sheets is connected, the form falls back to `data/products.json` and
 `data/customers.json` for local demos.
@@ -169,15 +185,15 @@ webform/
   js/i18n.js          EN / ES UI strings
   js/auth.js          Admin login + customer unlock helpers
   js/sheets.js        Sheets CSV/API loader + column mapping
-  js/app.js           Cart, search, submit
+  js/app.js           Cart, search, contacts, duplicate check, submit
   data/products.json  Demo fallback catalog
-  data/customers.json Demo fallback customers
+  data/customers.json Demo fallback customers (incl. sample Contacts)
 ```
 
 ## Production checklist
 
 - [ ] Host `webform/` on HTTPS (Netlify, Cloudflare Pages, S3+CloudFront, etc.)
-- [ ] Connect Google Sheets in `js/config.js` (Products / Clients / Previous)
+- [ ] Connect Google Sheets in `js/config.js` (Products / Clients / Contacts / Previous / Orders)
 - [ ] Align QBO Item ID + QuickBooks customer IDs in those sheets
 - [ ] Configure Make webhook + QBO OAuth + Twilio SMS
 - [ ] Set `demoMode: false` and a strong `webhookSecret`

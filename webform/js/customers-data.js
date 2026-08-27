@@ -28,7 +28,30 @@ window.DISFRUTA_CUSTOMERS = [
       }
     ],
     "preferredLanguage": "es",
-    "language": "es"
+    "language": "es",
+    "preferredCategories": [
+      "Frozen Fruit Pulps 14 Oz",
+      "Frozen Fruit Pulps 32 Oz",
+      "Frozen Food"
+    ],
+    "contacts": [
+      {
+        "qboCustomerId": "24",
+        "customerName": "Mercado Latino Fresh",
+        "contactName": "Ana Ruiz",
+        "phone": "+15551234001",
+        "email": "orders@mercadolatino.example",
+        "isPrimary": true
+      },
+      {
+        "qboCustomerId": "24",
+        "customerName": "Mercado Latino Fresh",
+        "contactName": "Luis Mercado",
+        "phone": "+15551234901",
+        "email": "luis@mercadolatino.example",
+        "isPrimary": false
+      }
+    ]
   },
   {
     "qboCustomerId": "31",
@@ -54,7 +77,8 @@ window.DISFRUTA_CUSTOMERS = [
       }
     ],
     "preferredLanguage": "en",
-    "language": "en"
+    "language": "en",
+    "preferredCategories": ["Dry Food", "Soda/Drinks"]
   },
   {
     "qboCustomerId": "48",
@@ -80,6 +104,12 @@ window.DISFRUTA_CUSTOMERS = [
       }
     ],
     "preferredLanguage": "es",
-    "language": "es"
+    "language": "es",
+    "preferredCategories": [
+      "Frozen Fruit Pulps 14 Oz",
+      "Frozen Fruit Pulps 32 Oz",
+      "Frozen Fruit Pulps 64 Oz",
+      "Frozen Food"
+    ]
   }
 ];

@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.4",
   "source": "customer-form",
   "declined": false,
   "submittedAt": "2026-07-12T18:30:00.000Z",
@@ -9,11 +9,27 @@
     "phone": "+15551234001",
     "email": "orders@mercadolatino.example",
     "frequency": "Weekly",
-    "dayOfWeek": "Wednesday"
+    "frequencyNote": "",
+    "dayOfWeek": "Wednesday",
+    "preferredCategories": [
+      "Frozen Fruit Pulps 14 Oz",
+      "Frozen Fruit Pulps 32 Oz",
+      "Frozen Food"
+    ],
+    "contact": {
+      "name": "Ana Ruiz",
+      "phone": "+15551234001",
+      "email": "orders@mercadolatino.example",
+      "isPrimary": true
+    }
   },
   "delivery": {
     "nextDeliveryDate": "2026-07-15",
-    "cutoffNote": "5:00 PM day before delivery"
+    "preferredDay": "Wednesday",
+    "frequency": "Weekly",
+    "intervalDays": 7,
+    "cutoffNote": "5:00 PM day before delivery",
+    "orderPeriodKey": "24|2026-07-15"
   },
   "notes": "Please leave boxes at the back door. Need sample of Arepa de Choclo.",
   "order": {

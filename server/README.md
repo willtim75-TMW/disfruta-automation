@@ -106,6 +106,7 @@ Success response:
 | Returning customer (`customer.qboCustomerId` set) | `POST /invoice` with that CustomerRef |
 | New customer (`isNewCustomer: true`) | Find/create Customer, then invoice |
 | Declined order | No invoice; `{ declined: true }` |
+| Duplicate order | Not enforced here — Make must search **Orders** first (`quickbooks_id` + `delivery_date`) |
 | Line missing `qboItemId` | **400** — fix Products sheet QBO Item IDs |
 
 ### Invoice fields mapped
